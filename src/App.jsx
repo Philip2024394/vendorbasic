@@ -68,7 +68,7 @@ const S = {
   shopName: { fontSize: 20, fontWeight: 700, flex: 1 },
   gearBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   vendorBar: { background: 'linear-gradient(135deg,#2d7a0e,#8DC63F)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 },
-  card: { background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative' },
+  card: { background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative', transition: 'all 0.3s ease' },
   cardImg: { width: 80, height: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0 },
   cardBody: { flex: 1, minWidth: 0 },
   cardName: { fontSize: 16, fontWeight: 600, marginBottom: 4 },
@@ -411,13 +411,28 @@ export default function App() {
                 </div>
 
                 {/* Delivery zone picker */}
-                <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'block' }}>
+                <label style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8, display: 'block' }}>
                   Delivery Zone {gpsLoading && '(detecting GPS...)'}
                 </label>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-                  {DELIVERY_ZONES.map((z) => (
-                    <button key={z.radius} style={S.zoneBtn(deliveryZone.radius === z.radius)} onClick={() => setDeliveryZone(z)}>
-                      {z.name}<br />{fmt(z.fee)}
+                <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden', marginBottom: 14 }}>
+                  {DELIVERY_ZONES.map((z, i) => (
+                    <button key={z.radius} onClick={() => setDeliveryZone(z)} style={{
+                      width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '14px 16px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      background: deliveryZone.radius === z.radius ? 'rgba(141,198,63,0.1)' : 'transparent',
+                      borderBottom: i < DELIVERY_ZONES.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                      borderLeft: deliveryZone.radius === z.radius ? '3px solid #8DC63F' : '3px solid transparent',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 20, height: 20, borderRadius: '50%', border: deliveryZone.radius === z.radius ? '2px solid #8DC63F' : '2px solid rgba(255,255,255,0.15)', background: deliveryZone.radius === z.radius ? '#8DC63F' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {deliveryZone.radius === z.radius && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }} />}
+                        </span>
+                        <div style={{ textAlign: 'left' }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', display: 'block' }}>{z.name}</span>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Within {z.radius} km</span>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: z.fee === 0 ? '#8DC63F' : '#FACC15' }}>{z.fee === 0 ? 'FREE' : fmt(z.fee)}</span>
                     </button>
                   ))}
                 </div>
