@@ -68,7 +68,7 @@ const S = {
   shopName: { fontSize: 20, fontWeight: 700, flex: 1 },
   gearBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   vendorBar: { background: 'linear-gradient(135deg,#2d7a0e,#8DC63F)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 },
-  card: { background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative', transition: 'all 0.3s ease' },
+  card: { background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: 'none', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative', transition: 'all 0.3s ease' },
   cardImg: { width: 80, height: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0 },
   cardBody: { flex: 1, minWidth: 0 },
   cardName: { fontSize: 16, fontWeight: 600, marginBottom: 4 },
@@ -101,6 +101,7 @@ const S = {
 /* ─── Main App ─── */
 export default function App() {
   /* --- State --- */
+  const [showLanding, setShowLanding] = useState(true)
   const [menuItems, setMenuItems] = useState(() => loadJSON('vendorbasic_menu', DEMO_MENU))
   const [cart, setCart] = useState([])
   const [isVendor, setIsVendor] = useState(false)
@@ -261,6 +262,54 @@ export default function App() {
   /* ═══════════════════════ RENDER ═══════════════════════ */
   return (
     <div style={S.page}>
+      {/* ═══ LANDING PAGE ═══ */}
+      {showLanding && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, overflow: 'hidden' }}>
+          {/* Background image */}
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%203,%202026,%2009_03_46%20AM.png)', backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
+
+          {/* Content — centered */}
+          <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Shop logo */}
+            {shopLogo && <img src={shopLogo} alt="" style={{ width: 80, height: 80, borderRadius: 20, objectFit: 'cover', marginBottom: 16, border: '2px solid rgba(255,255,255,0.1)' }} />}
+
+            {/* Burnt text — shop name */}
+            <div style={{ textAlign: 'center', marginBottom: 40 }}>
+              <span style={{
+                fontSize: 20, fontWeight: 900, fontFamily: '"Georgia", "Times New Roman", serif',
+                color: 'transparent',
+                backgroundImage: 'linear-gradient(180deg, rgba(90,45,12,0.65) 0%, rgba(90,45,12,0.65) 100%)',
+                WebkitBackgroundClip: 'text', backgroundClip: 'text',
+                textShadow: '0 1px 0 rgba(0,0,0,0.2)',
+                letterSpacing: '8px', textTransform: 'uppercase', userSelect: 'none',
+                filter: 'contrast(1.3)',
+              }}>{shopName}</span>
+            </div>
+          </div>
+
+          {/* Language selector — top right */}
+          <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
+            <button onClick={() => setVendorLogin(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+          </div>
+
+          {/* Enter button — bottom */}
+          <div style={{ position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 10 }}>
+            <style>{`@keyframes landingGlow { 0% { left: -100%; } 100% { left: 200%; } }`}</style>
+            <button onClick={() => setShowLanding(false)} style={{
+              padding: '14px 50px', border: 'none', background: '#000', borderRadius: 12,
+              cursor: 'pointer', color: '#fff', fontSize: 16, fontWeight: 800,
+              letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'inherit',
+              position: 'relative', overflow: 'hidden',
+            }}>
+              <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 12 }}>
+                <div style={{ position: 'absolute', top: 0, width: '50%', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'landingGlow 3s ease-in-out infinite' }} />
+              </div>
+              <span style={{ position: 'relative', zIndex: 1 }}>Enter</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* --- Vendor mode bar --- */}
       {isVendor && (
         <div style={S.vendorBar}>
