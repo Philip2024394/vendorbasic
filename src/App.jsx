@@ -9,6 +9,23 @@ const DELIVERY_ZONES = [
   { name: '10-15 km', radius: 15, fee: 22000, label: '~Rp 22,000' },
 ]
 
+/* ─── Food Type Categories ─── */
+const FOOD_TYPES = {
+  'Nasi': ['Nasi Goreng', 'Nasi Uduk', 'Nasi Kuning', 'Nasi Padang', 'Nasi Campur', 'Nasi Kucing', 'Nasi Bakar', 'Nasi Pecel', 'Nasi Liwet', 'Lontong Sayur', 'Ketupat Sayur'],
+  'Mie': ['Mie Goreng', 'Mie Rebus', 'Mie Ayam', 'Bakmi Jawa', 'Mie Tek-Tek', 'Kwetiau Goreng', 'Bihun Goreng', 'Mie Aceh'],
+  'Sop/Soto': ['Soto Ayam', 'Soto Betawi', 'Soto Lamongan', 'Soto Madura', 'Bakso', 'Bakso Urat', 'Rawon', 'Tongseng', 'Sop Iga', 'Sop Buntut'],
+  'Sate/Bakar': ['Sate Ayam', 'Sate Kambing', 'Sate Padang', 'Sate Madura', 'Sate Taichan', 'Sate Usus', 'Jagung Bakar', 'Ikan Bakar', 'Ayam Bakar'],
+  'Gorengan': ['Bakwan', 'Tahu Goreng', 'Tempe Goreng', 'Tahu Isi', 'Pisang Goreng', 'Ubi Goreng', 'Risoles', 'Cireng', 'Comro', 'Martabak Telur'],
+  'Jajanan': ['Siomay', 'Batagor', 'Pempek', 'Cilok', 'Cimol', 'Tahu Bulat', 'Lumpia', 'Seblak', 'Telur Gulung', 'Sempol Ayam', 'Sosis Bakar'],
+  'Ayam': ['Ayam Goreng', 'Ayam Bakar', 'Ayam Penyet', 'Ayam Geprek', 'Ayam Kremes', 'Ayam Rica-Rica', 'Pecel Lele'],
+  'Seafood': ['Ikan Bakar', 'Ikan Goreng', 'Udang Bakar', 'Cumi Goreng', 'Kerang Rebus', 'Gurame Goreng'],
+  'Roti': ['Roti Bakar', 'Martabak Manis', 'Roti Canai', 'Pukis', 'Kue Cubit', 'Kue Pancong'],
+  'Minuman': ['Es Teh Manis', 'Es Jeruk', 'Es Kelapa', 'Es Cendol', 'Es Campur', 'Es Cincau', 'Es Teler', 'Jus Alpukat', 'Jus Mangga', 'Wedang Jahe', 'Bandrek', 'Sekoteng', 'Es Buah'],
+  'Dessert': ['Klepon', 'Onde-Onde', 'Lupis', 'Dadar Gulung', 'Serabi', 'Kue Putu', 'Kue Lapis', 'Getuk', 'Wingko'],
+  'Bubur': ['Bubur Ayam', 'Bubur Kacang Hijau', 'Bubur Sumsum', 'Bubur Ketan Hitam', 'Bubur Manado'],
+}
+const FOOD_TYPE_KEYS = Object.keys(FOOD_TYPES)
+
 /* ─── Demo Menu ─── */
 const DEMO_MENU = [
   { id: 1, name: 'Nasi Goreng', price: 15000, photo: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=300', desc: 'Fried rice with egg, vegetables, and kecap manis', category: 'Meal', available: true },
@@ -126,6 +143,7 @@ export default function App() {
   const [shopTiktok, setShopTiktok] = useState(() => localStorage.getItem('vendorbasic_shopTT') || '')
   const [shopFoodType, setShopFoodType] = useState(() => localStorage.getItem('vendorbasic_shopFoodType') || 'Indonesian & Street Food')
   const [showLocation, setShowLocation] = useState(false)
+  const [locationSuggestions, setLocationSuggestions] = useState([])
 
   /* Checkout form */
   const [custName, setCustName] = useState('')
@@ -410,14 +428,26 @@ export default function App() {
 
       {/* --- Menu --- */}
       <div style={{ paddingBottom: 12 }}>
-        {['Meal', 'Drink', 'Dessert', 'Snack'].map(cat => {
-          const catItems = visibleMenu.filter(i => (i.category || 'Meal') === cat)
-          if (catItems.length === 0) return null
-          return (
+        {(() => {
+          // Group items by parent category
+          const CAT_ICONS = { Nasi: '🍚', Mie: '🍜', 'Sop/Soto': '🍲', 'Sate/Bakar': '🔥', Gorengan: '🍳', Jajanan: '🍡', Ayam: '🍗', Seafood: '🦐', Roti: '🍞', Minuman: '🥤', Dessert: '🍰', Bubur: '🥣' }
+          const getParentCat = (itemCat) => {
+            for (const [parent, items] of Object.entries(FOOD_TYPES)) {
+              if (items.includes(itemCat)) return parent
+            }
+            return itemCat || 'Other'
+          }
+          const grouped = {}
+          visibleMenu.forEach(item => {
+            const parent = getParentCat(item.category)
+            if (!grouped[parent]) grouped[parent] = []
+            grouped[parent].push(item)
+          })
+          return Object.entries(grouped).map(([cat, catItems]) => (
             <div key={cat}>
               <div style={{ padding: '14px 16px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>{cat === 'Meal' ? '🍽️' : cat === 'Drink' ? '🥤' : cat === 'Dessert' ? '🍰' : '🍿'}</span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: '#8DC63F', textTransform: 'uppercase', letterSpacing: 1 }}>{cat}s</span>
+                <span style={{ fontSize: 16 }}>{CAT_ICONS[cat] || '🍽️'}</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#8DC63F', textTransform: 'uppercase', letterSpacing: 1 }}>{cat}</span>
               </div>
               {catItems.map((item) => (
           <div
@@ -454,8 +484,8 @@ export default function App() {
           </div>
         ))}
             </div>
-          )
-        })}
+          ))
+        })()}
 
         {visibleMenu.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>No items on the menu</div>
@@ -728,16 +758,16 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Edit Item</h2>
             <input style={S.input} placeholder="Name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             <input style={S.input} placeholder="Price (number)" type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              {['Meal', 'Drink', 'Dessert', 'Snack'].map(cat => (
-                <button key={cat} onClick={() => setFormCategory(cat)} style={{
-                  flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  border: formCategory === cat ? '2px solid #8DC63F' : '1px solid rgba(255,255,255,0.12)',
-                  background: formCategory === cat ? 'rgba(141,198,63,0.15)' : 'transparent',
-                  color: formCategory === cat ? '#8DC63F' : 'rgba(255,255,255,0.5)',
-                }}>{cat}</button>
+            <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)} style={{ ...S.input, appearance: 'auto', fontSize: 13, padding: '10px 12px' }}>
+              {FOOD_TYPE_KEYS.map(cat => (
+                <optgroup key={cat} label={cat} style={{ background: '#1a1a1a' }}>
+                  {FOOD_TYPES[cat].map(item => (
+                    <option key={item} value={item} style={{ background: '#1a1a1a' }}>{item}</option>
+                  ))}
+                </optgroup>
               ))}
-            </div>
+              <option value="Other" style={{ background: '#1a1a1a' }}>Other (custom)</option>
+            </select>
             <div style={{ marginBottom: 10 }}>
               {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
               <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
@@ -779,16 +809,16 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Add Item</h2>
             <input style={S.input} placeholder="Name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             <input style={S.input} placeholder="Price (number)" type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              {['Meal', 'Drink', 'Dessert', 'Snack'].map(cat => (
-                <button key={cat} onClick={() => setFormCategory(cat)} style={{
-                  flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  border: formCategory === cat ? '2px solid #8DC63F' : '1px solid rgba(255,255,255,0.12)',
-                  background: formCategory === cat ? 'rgba(141,198,63,0.15)' : 'transparent',
-                  color: formCategory === cat ? '#8DC63F' : 'rgba(255,255,255,0.5)',
-                }}>{cat}</button>
+            <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)} style={{ ...S.input, appearance: 'auto', fontSize: 13, padding: '10px 12px' }}>
+              {FOOD_TYPE_KEYS.map(cat => (
+                <optgroup key={cat} label={cat} style={{ background: '#1a1a1a' }}>
+                  {FOOD_TYPES[cat].map(item => (
+                    <option key={item} value={item} style={{ background: '#1a1a1a' }}>{item}</option>
+                  ))}
+                </optgroup>
               ))}
-            </div>
+              <option value="Other" style={{ background: '#1a1a1a' }}>Other (custom)</option>
+            </select>
             <div style={{ marginBottom: 10 }}>
               {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
               <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
@@ -830,14 +860,48 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Shop Settings</h2>
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Shop Name</label>
             <input style={S.input} value={shopName} onChange={(e) => setShopName(e.target.value)} />
-            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Logo URL</label>
-            <input style={S.input} value={shopLogo} onChange={(e) => setShopLogo(e.target.value)} />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>WhatsApp Number (with country code)</label>
             <input style={S.input} value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Food Type / Description</label>
             <input style={S.input} value={shopFoodType} onChange={(e) => setShopFoodType(e.target.value)} placeholder="e.g. Indonesian & Street Food" />
-            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Stall Address</label>
-            <input style={S.input} value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} placeholder="Jl. Malioboro, depan Bank BCA" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Stall Location</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+              <input style={{ ...S.input, flex: 1, marginBottom: 0 }} value={shopAddress} onChange={async (e) => {
+                setShopAddress(e.target.value)
+                if (e.target.value.length > 3) {
+                  try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(e.target.value)}&format=json&limit=3&countrycodes=id`)
+                    const data = await res.json()
+                    setLocationSuggestions(data.map(d => d.display_name))
+                  } catch { setLocationSuggestions([]) }
+                } else { setLocationSuggestions([]) }
+              }} placeholder="Search address or use GPS" />
+              <button onClick={() => {
+                if (!navigator.geolocation) return
+                navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+                  try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`)
+                    const data = await res.json()
+                    setShopAddress(data.display_name || `${coords.latitude}, ${coords.longitude}`)
+                    // Get 3 nearby suggestions
+                    const nearby = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(data.address?.road || data.address?.suburb || '')}&format=json&limit=3&countrycodes=id&viewbox=${coords.longitude-0.01},${coords.latitude+0.01},${coords.longitude+0.01},${coords.latitude-0.01}`)
+                    const nearbyData = await nearby.json()
+                    setLocationSuggestions(nearbyData.map(d => d.display_name))
+                  } catch { setShopAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`) }
+                }, () => alert('Please allow location access'), { enableHighAccuracy: true, timeout: 10000 })
+              }} style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: '#8DC63F', color: '#000', fontSize: 16, cursor: 'pointer', flexShrink: 0 }}>📍</button>
+            </div>
+            {locationSuggestions.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {locationSuggestions.map((s, i) => (
+                  <button key={i} onClick={() => { setShopAddress(s); setLocationSuggestions([]) }} style={{
+                    width: '100%', padding: '8px 12px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer',
+                    textAlign: 'left', fontFamily: 'inherit',
+                  }}>{s}</button>
+                ))}
+              </div>
+            )}
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Opening Hours</label>
             <input style={S.input} value={shopHours} onChange={(e) => setShopHours(e.target.value)} placeholder="17:00 – 23:00" />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Google Maps Link</label>
