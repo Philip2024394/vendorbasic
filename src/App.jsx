@@ -312,7 +312,7 @@ export default function App() {
       {showLanding && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, overflow: 'hidden' }}>
           {/* Background image */}
-          <img src="https://ik.imagekit.io/nepgaxllc/Untitleddsasdaaaa.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
+          <img src="https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%205,%202026,%2007_57_10%20AM.png?updatedAt=1777942652258" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
 
           {/* Header — language + vendor login */}
           <div style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -675,7 +675,7 @@ export default function App() {
       {/* ═══ VENDOR LOGIN MODAL ═══ */}
       {vendorLogin && (
         <div style={{ ...S.overlay, alignItems: 'center' }} onClick={() => { setVendorLogin(false); setLoginMode('login'); setLoginError('') }}>
-          <div style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderRadius: 14, maxWidth: 270, width: '88%', padding: '16px 14px 12px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2022,%202026,%2006_39_04%20AM.png?updatedAt=1776814761653)', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 14, maxWidth: 270, width: '88%', padding: '16px 14px 12px', position: 'relative', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }} onClick={(e) => e.stopPropagation()}>
             <button onClick={() => { setVendorLogin(false); setLoginMode('login'); setLoginError('') }} style={{ position: 'absolute', top: 6, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 16, cursor: 'pointer' }}>&times;</button>
 
             {loginMode === 'login' ? (
@@ -714,7 +714,32 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Edit Item</h2>
             <input style={S.input} placeholder="Name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             <input style={S.input} placeholder="Price (number)" type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
-            <input style={S.input} placeholder="Photo URL" value={formPhoto} onChange={(e) => setFormPhoto(e.target.value)} />
+            <div style={{ marginBottom: 10 }}>
+              {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
+              <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
+                {formPhoto ? 'Change Photo' : '📷 Upload Photo'}
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    // Compress via canvas
+                    const img = new Image()
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas')
+                      const max = 600
+                      let w = img.width, h = img.height
+                      if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r) }
+                      canvas.width = w; canvas.height = h
+                      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+                      setFormPhoto(canvas.toDataURL('image/jpeg', 0.7))
+                    }
+                    img.src = reader.result
+                  }
+                  reader.readAsDataURL(file)
+                }} />
+              </label>
+            </div>
             <input style={S.input} placeholder="Description" value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
             <button style={S.btnGreen} onClick={saveEdit}>Save Changes</button>
             <button style={S.btnOutline} onClick={() => setEditItem(null)}>Cancel</button>
@@ -730,7 +755,32 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Add Item</h2>
             <input style={S.input} placeholder="Name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             <input style={S.input} placeholder="Price (number)" type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
-            <input style={S.input} placeholder="Photo URL" value={formPhoto} onChange={(e) => setFormPhoto(e.target.value)} />
+            <div style={{ marginBottom: 10 }}>
+              {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
+              <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
+                {formPhoto ? 'Change Photo' : '📷 Upload Photo'}
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    // Compress via canvas
+                    const img = new Image()
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas')
+                      const max = 600
+                      let w = img.width, h = img.height
+                      if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r) }
+                      canvas.width = w; canvas.height = h
+                      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+                      setFormPhoto(canvas.toDataURL('image/jpeg', 0.7))
+                    }
+                    img.src = reader.result
+                  }
+                  reader.readAsDataURL(file)
+                }} />
+              </label>
+            </div>
             <input style={S.input} placeholder="Description" value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
             <button style={S.btnGreen} onClick={saveAdd}>Add to Menu</button>
             <button style={S.btnOutline} onClick={() => setAddingItem(false)}>Cancel</button>
