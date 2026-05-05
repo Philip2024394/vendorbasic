@@ -137,6 +137,7 @@ export default function App() {
   const [orderDone, setOrderDone] = useState(false)
 
   /* Vendor login form */
+  const [loginPhone, setLoginPhone] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
 
@@ -192,14 +193,20 @@ export default function App() {
 
   /* --- Vendor login --- */
   const handleVendorLogin = () => {
-    const stored = localStorage.getItem('indoo_vendor_pass') || 'vendor123'
-    if (loginPass === stored) {
+    if (!loginPhone.trim()) { setLoginError('Enter WhatsApp number'); return }
+    if (!loginPass.trim()) { setLoginError('Enter password'); return }
+    const storedPhone = localStorage.getItem('indoo_vendor_phone') || shopPhone
+    const storedPass = localStorage.getItem('indoo_vendor_pass') || 'vendor123'
+    const phoneClean = loginPhone.replace(/[^0-9]/g, '')
+    const storedClean = storedPhone.replace(/[^0-9]/g, '')
+    if (phoneClean === storedClean && loginPass === storedPass) {
       setIsVendor(true)
       setVendorLogin(false)
+      setLoginPhone('')
       setLoginPass('')
       setLoginError('')
     } else {
-      setLoginError('Wrong password')
+      setLoginError('Wrong number or password')
     }
   }
 
@@ -440,7 +447,7 @@ export default function App() {
       {/* ═══ ITEM DETAIL MODAL ═══ */}
       {itemModal && (
         <div style={S.overlay} onClick={() => setItemModal(null)}>
-          <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...S.modal, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%203,%202026,%2012_07_40%20PM.png?updatedAt=1777784877580)', backgroundSize: 'cover', backgroundPosition: 'center' }} onClick={(e) => e.stopPropagation()}>
             <button style={S.closeBtnX} onClick={() => setItemModal(null)}>&times;</button>
             <img
               src={itemModal.photo || 'https://via.placeholder.com/300'}
@@ -651,19 +658,28 @@ export default function App() {
       {/* ═══ VENDOR LOGIN MODAL ═══ */}
       {vendorLogin && (
         <div style={S.overlay} onClick={() => setVendorLogin(false)}>
-          <div style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)', borderRadius: 16, maxWidth: 260, width: '90%', padding: '20px 16px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-            <button style={S.closeBtnX} onClick={() => setVendorLogin(false)}>&times;</button>
-            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, textAlign: 'center' }}>Vendor Login</h3>
+          <div style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderRadius: 12, maxWidth: 260, width: '85%', padding: '14px 14px 10px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setVendorLogin(false)} style={{ position: 'absolute', top: 6, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 16, cursor: 'pointer' }}>&times;</button>
+            <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 8, textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>Vendor Login</h3>
             <input
-              style={{ ...S.input, fontSize: 14, padding: '10px 12px' }}
-              type="password"
-              placeholder="Password"
-              value={loginPass}
-              onChange={(e) => setLoginPass(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleVendorLogin()}
+              style={{ ...S.input, fontSize: 13, padding: '8px 10px', marginBottom: 6 }}
+              type="tel"
+              placeholder="WhatsApp number"
+              value={loginPhone}
+              onChange={(e) => setLoginPhone(e.target.value)}
             />
-            {loginError && <div style={{ color: '#ff6b6b', fontSize: 13, marginBottom: 6 }}>{loginError}</div>}
-            <button style={{ ...S.btnGreen, padding: '10px', fontSize: 14 }} onClick={handleVendorLogin}>Login</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                style={{ ...S.input, fontSize: 13, padding: '8px 10px', marginBottom: 0, flex: 1 }}
+                type="password"
+                placeholder="Password"
+                value={loginPass}
+                onChange={(e) => setLoginPass(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleVendorLogin()}
+              />
+              <button style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: '#8DC63F', color: '#000', fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleVendorLogin}>Go</button>
+            </div>
+            {loginError && <div style={{ color: '#ff6b6b', fontSize: 12, marginTop: 4 }}>{loginError}</div>}
           </div>
         </div>
       )}
