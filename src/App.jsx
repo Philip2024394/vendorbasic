@@ -288,7 +288,7 @@ export default function App() {
       {showLanding && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, overflow: 'hidden' }}>
           {/* Background image */}
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%205,%202026,%2007_57_10%20AM.png)', backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
+          <img src="https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%205,%202026,%2007_57_10%20AM.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
 
           {/* Header — language + vendor login */}
           <div style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -374,11 +374,6 @@ export default function App() {
           <button onClick={() => setShowLocation(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 20, cursor: 'pointer', padding: 8, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             📍
           </button>
-          {!isVendor && (
-            <button style={S.gearBtn} onClick={() => setVendorLogin(true)} aria-label="Vendor login">
-              &#9881;
-            </button>
-          )}
         </div>
       </div>
 
@@ -483,9 +478,14 @@ export default function App() {
           <div style={{ position: 'fixed', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', pointerEvents: 'none' }} />
 
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', position: 'relative', zIndex: 1 }}>
-            <button onClick={() => setShowLocation(false)} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
-            <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Find Us</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button onClick={() => setShowLocation(false)} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Find Us</h2>
+            </div>
+            {!isVendor && (
+              <button onClick={() => { setShowLocation(false); setVendorLogin(true) }} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+            )}
           </div>
 
           <div style={{ padding: '0 16px 40px', position: 'relative', zIndex: 1 }}>
