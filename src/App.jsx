@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import AdminDashboard from './AdminDashboard'
+import ActivatePage from './ActivatePage'
 
 /* ─── Supabase Vendor Service ─── */
 async function vendorSignup(phone, password, name) {
@@ -210,6 +212,13 @@ const S = {
 
 /* ─── Main App ─── */
 export default function App() {
+  // Route to admin or activate page
+  const params = new URLSearchParams(window.location.search)
+  const viewMode = params.get('view') || (window.location.pathname === '/admin' ? 'admin' : window.location.pathname === '/activate' ? 'activate' : null)
+
+  if (viewMode === 'admin') return <AdminDashboard />
+  if (viewMode === 'activate') return <ActivatePage />
+
   /* --- State --- */
   const [showLanding, setShowLanding] = useState(true)
   const [menuItems, setMenuItems] = useState(() => loadJSON('vendorbasic_menu', DEMO_MENU))
@@ -253,6 +262,8 @@ export default function App() {
   const [loginMode, setLoginMode] = useState('login') // 'login' or 'signup'
   const [signupName, setSignupName] = useState('')
   const [vendorId, setVendorId] = useState(() => localStorage.getItem('vendorbasic_vendorId') || null)
+  const [vendorStatus, setVendorStatus] = useState(null) // 'active' | 'expired' | 'pending'
+  const [vendorExpiresAt, setVendorExpiresAt] = useState(null)
 
   /* New / edit item form */
   const [formName, setFormName] = useState('')
@@ -323,6 +334,15 @@ export default function App() {
       setShopInstagram(vendor.shop_instagram || '')
       setShopTiktok(vendor.shop_tiktok || '')
       setShopOpen(vendor.shop_open !== false)
+      // Set subscription status
+      if (vendor.status) setVendorStatus(vendor.status)
+      if (vendor.expires_at) {
+        setVendorExpiresAt(vendor.expires_at)
+        // Auto-check if expired
+        if (new Date(vendor.expires_at) < new Date() && vendor.status === 'active') {
+          setVendorStatus('expired')
+        }
+      }
       // Load menu from Supabase
       const items = await getVendorMenuItems(vendor.id)
       if (items.length > 0) {
@@ -517,11 +537,26 @@ export default function App() {
       {/* --- Vendor mode bar --- */}
       {isVendor && (
         <div style={S.vendorBar}>
-          <span>Vendor Mode</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>Vendor Mode</span>
+            {vendorExpiresAt && (() => {
+              const days = Math.ceil((new Date(vendorExpiresAt) - new Date()) / (1000 * 60 * 60 * 24))
+              return days > 0 ? (
+                <span style={{ fontSize: 12, background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 8 }}>{days}d left</span>
+              ) : null
+            })()}
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button style={{ ...S.smallBtn('rgba(0,0,0,0.2)'), color: '#fff' }} onClick={() => setShopConfig(true)}>Shop Config</button>
             <button style={{ ...S.smallBtn('rgba(0,0,0,0.3)'), color: '#fff' }} onClick={() => setIsVendor(false)}>Logout</button>
           </div>
+        </div>
+      )}
+
+      {/* --- Subscription expired banner --- */}
+      {isVendor && vendorStatus === 'expired' && (
+        <div style={{ background: 'rgba(255,60,60,0.15)', border: '1px solid rgba(255,60,60,0.3)', borderRadius: 12, margin: '8px 12px', padding: '12px 16px', textAlign: 'center', color: '#ff6b6b', fontSize: 14, fontWeight: 600 }}>
+          Subscription expired — contact admin to renew
         </div>
       )}
 
@@ -587,7 +622,7 @@ export default function App() {
               <div style={S.cardPrice}>{fmt(item.price)}</div>
 
               {/* Vendor controls */}
-              {isVendor && (
+              {isVendor && vendorStatus !== 'expired' && (
                 <div style={S.vendorBtns}>
                   <button style={S.toggle(item.available)} onClick={() => toggleAvailability(item.id)}>
                     <div style={S.toggleDot(item.available)} />
@@ -614,7 +649,7 @@ export default function App() {
       </div>
 
       {/* --- FAB add item (vendor) --- */}
-      {isVendor && <button style={S.fab} onClick={startAdd}>+</button>}
+      {isVendor && vendorStatus !== 'expired' && <button style={S.fab} onClick={startAdd}>+</button>}
 
       {/* --- Sticky Cart Bar --- */}
       {totalItems > 0 && !isVendor && (
