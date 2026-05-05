@@ -288,12 +288,34 @@ export default function App() {
       {showLanding && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, overflow: 'hidden' }}>
           {/* Background image */}
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%203,%202026,%2009_03_46%20AM.png)', backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%205,%202026,%2007_57_10%20AM.png)', backgroundSize: '100% 100%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }} />
+
+          {/* Header — language + vendor login */}
+          <div style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Language selector */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { code: 'en', label: 'EN', img: 'https://ik.imagekit.io/nepgaxllc/Untitledxxxx-removebg-preview.png?updatedAt=1777592742536' },
+                { code: 'id', label: 'ID', img: 'https://ik.imagekit.io/nepgaxllc/Untitledxxxxcc-removebg-preview.png?updatedAt=1777592820803' },
+              ].map(l => (
+                <button key={l.code} onClick={() => localStorage.setItem('vendorbasic_lang', l.code)} style={{
+                  width: 36, height: 36, borderRadius: '50%', padding: 0,
+                  border: (localStorage.getItem('vendorbasic_lang') || 'en') === l.code ? '2px solid #8DC63F' : '2px solid transparent',
+                  background: 'rgba(0,0,0,0.5)', cursor: 'pointer', overflow: 'hidden',
+                  opacity: (localStorage.getItem('vendorbasic_lang') || 'en') === l.code ? 1 : 0.5,
+                }}>
+                  <img src={l.img} alt={l.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </button>
+              ))}
+            </div>
+            {/* Vendor login */}
+            <button onClick={() => setVendorLogin(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+          </div>
 
           {/* Content — centered */}
           <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             {/* Shop logo */}
-            {shopLogo && <img src={shopLogo} alt="" style={{ width: 80, height: 80, borderRadius: 20, objectFit: 'cover', marginBottom: 16, border: '2px solid rgba(255,255,255,0.1)' }} />}
+            {shopLogo && <img src={shopLogo} alt="" style={{ width: 80, height: 80, borderRadius: 20, objectFit: 'cover', marginBottom: 16 }} />}
 
             {/* Burnt text — shop name */}
             <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -309,22 +331,17 @@ export default function App() {
             </div>
           </div>
 
-          {/* Language selector — top right */}
-          <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
-            <button onClick={() => setVendorLogin(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
-          </div>
-
-          {/* Enter button — bottom */}
+          {/* Enter button — yellow — bottom */}
           <div style={{ position: 'absolute', bottom: 40, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 10 }}>
             <style>{`@keyframes landingGlow { 0% { left: -100%; } 100% { left: 200%; } }`}</style>
             <button onClick={() => setShowLanding(false)} style={{
-              padding: '14px 50px', border: 'none', background: '#000', borderRadius: 12,
-              cursor: 'pointer', color: '#fff', fontSize: 16, fontWeight: 800,
+              padding: '14px 50px', border: 'none', background: '#FACC15', borderRadius: 12,
+              cursor: 'pointer', color: '#000', fontSize: 16, fontWeight: 800,
               letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'inherit',
               position: 'relative', overflow: 'hidden',
             }}>
               <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 12 }}>
-                <div style={{ position: 'absolute', top: 0, width: '50%', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'landingGlow 3s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', top: 0, width: '50%', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)', animation: 'landingGlow 3s ease-in-out infinite' }} />
               </div>
               <span style={{ position: 'relative', zIndex: 1 }}>Enter</span>
             </button>
@@ -463,7 +480,7 @@ export default function App() {
       {showLocation && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 250, background: '#0a0a0a', overflowY: 'auto' }}>
           {/* Background */}
-          <div style={{ position: 'fixed', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.15, pointerEvents: 'none' }} />
+          <div style={{ position: 'fixed', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', pointerEvents: 'none' }} />
 
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', position: 'relative', zIndex: 1 }}>
@@ -634,19 +651,19 @@ export default function App() {
       {/* ═══ VENDOR LOGIN MODAL ═══ */}
       {vendorLogin && (
         <div style={S.overlay} onClick={() => setVendorLogin(false)}>
-          <div style={{ ...S.modal, maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)', borderRadius: 16, maxWidth: 260, width: '90%', padding: '20px 16px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
             <button style={S.closeBtnX} onClick={() => setVendorLogin(false)}>&times;</button>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Vendor Login</h2>
+            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, textAlign: 'center' }}>Vendor Login</h3>
             <input
-              style={S.input}
+              style={{ ...S.input, fontSize: 14, padding: '10px 12px' }}
               type="password"
               placeholder="Password"
               value={loginPass}
               onChange={(e) => setLoginPass(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleVendorLogin()}
             />
-            {loginError && <div style={{ color: '#ff6b6b', fontSize: 14, marginBottom: 8 }}>{loginError}</div>}
-            <button style={S.btnGreen} onClick={handleVendorLogin}>Login</button>
+            {loginError && <div style={{ color: '#ff6b6b', fontSize: 13, marginBottom: 6 }}>{loginError}</div>}
+            <button style={{ ...S.btnGreen, padding: '10px', fontSize: 14 }} onClick={handleVendorLogin}>Login</button>
           </div>
         </div>
       )}
