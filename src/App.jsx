@@ -1,4 +1,96 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+
+/* ─── Supabase Vendor Service ─── */
+async function vendorSignup(phone, password, name) {
+  if (!supabase) return { id: 'local-' + Date.now(), slug: name.toLowerCase().replace(/[^a-z0-9]/g, '-') }
+  const { data, error } = await supabase.from('vendor_accounts').insert({
+    phone: phone.replace(/[^0-9]/g, ''),
+    password_hash: password, // In production, hash this
+    shop_name: name,
+    shop_phone: phone.replace(/[^0-9]/g, ''),
+    slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').slice(0, 30),
+  }).select().single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+async function vendorLogin(phone, password) {
+  if (!supabase) return null
+  const { data } = await supabase.from('vendor_accounts')
+    .select('*')
+    .eq('phone', phone.replace(/[^0-9]/g, ''))
+    .eq('password_hash', password)
+    .single()
+  return data || null
+}
+
+async function updateVendorConfig(vendorId, config) {
+  if (!supabase || !vendorId || String(vendorId).startsWith('local')) return
+  await supabase.from('vendor_accounts').update(config).eq('id', vendorId)
+}
+
+async function getVendorBySlug(slug) {
+  if (!supabase) return null
+  const { data } = await supabase.from('vendor_accounts').select('*').eq('slug', slug).single()
+  return data
+}
+
+async function getVendorMenuItems(vendorId) {
+  if (!supabase || !vendorId) return []
+  const { data } = await supabase.from('vendor_menu_items').select('*').eq('vendor_id', vendorId).eq('available', true).order('sort_order')
+  return data || []
+}
+
+async function saveMenuItem(vendorId, item) {
+  if (!supabase || !vendorId || String(vendorId).startsWith('local')) return item
+  if (item.supabaseId) {
+    await supabase.from('vendor_menu_items').update({
+      name: item.name, price: item.price, description: item.desc,
+      category: item.category, photo_url: item.photo, available: item.available,
+    }).eq('id', item.supabaseId)
+    return item
+  }
+  const { data } = await supabase.from('vendor_menu_items').insert({
+    vendor_id: vendorId, name: item.name, price: item.price,
+    description: item.desc, category: item.category, photo_url: item.photo,
+    available: item.available !== false,
+  }).select().single()
+  return { ...item, supabaseId: data?.id }
+}
+
+async function deleteMenuItemSupa(itemId) {
+  if (!supabase || !itemId) return
+  await supabase.from('vendor_menu_items').delete().eq('id', itemId)
+}
+
+async function uploadMenuImage(vendorId, file) {
+  if (!supabase) return null
+  const ext = 'jpg'
+  const path = `vendor-menu/${vendorId}/${Date.now()}.${ext}`
+  // Compress first
+  const compressed = await new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const max = 600
+        let w = img.width, h = img.height
+        if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r) }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        canvas.toBlob(resolve, 'image/jpeg', 0.7)
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+  const { error } = await supabase.storage.from('images').upload(path, compressed, { contentType: 'image/jpeg', upsert: false })
+  if (error) return null
+  const { data } = supabase.storage.from('images').getPublicUrl(path)
+  return data?.publicUrl || null
+}
 
 /* ─── Estimated Delivery Costs (based on GoJek/Grab rates) ─── */
 const DELIVERY_ZONES = [
@@ -160,6 +252,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('')
   const [loginMode, setLoginMode] = useState('login') // 'login' or 'signup'
   const [signupName, setSignupName] = useState('')
+  const [vendorId, setVendorId] = useState(() => localStorage.getItem('vendorbasic_vendorId') || null)
 
   /* New / edit item form */
   const [formName, setFormName] = useState('')
@@ -169,6 +262,7 @@ export default function App() {
   const [formDesc, setFormDesc] = useState('')
 
   /* --- Persist menu --- */
+  useEffect(() => { if (vendorId) localStorage.setItem('vendorbasic_vendorId', vendorId) }, [vendorId])
   useEffect(() => { saveJSON('vendorbasic_menu', menuItems) }, [menuItems])
   useEffect(() => { localStorage.setItem('vendorbasic_shopName', shopName) }, [shopName])
   useEffect(() => { localStorage.setItem('vendorbasic_shopLogo', shopLogo) }, [shopLogo])
@@ -213,37 +307,60 @@ export default function App() {
   }, [])
 
   /* --- Vendor login --- */
-  const handleVendorLogin = () => {
+  const handleVendorLogin = async () => {
     if (!loginPhone.trim()) { setLoginError('Enter WhatsApp number'); return }
     if (!loginPass.trim()) { setLoginError('Enter password'); return }
+    // Try Supabase first
+    const vendor = await vendorLogin(loginPhone, loginPass)
+    if (vendor) {
+      setVendorId(vendor.id)
+      setShopName(vendor.shop_name || shopName)
+      setShopPhone(vendor.shop_phone || shopPhone)
+      setShopAddress(vendor.shop_address || shopAddress)
+      setShopHours(vendor.shop_hours || shopHours)
+      setShopFoodType(vendor.shop_food_type || shopFoodType)
+      setShopMapsLink(vendor.shop_maps_link || '')
+      setShopInstagram(vendor.shop_instagram || '')
+      setShopTiktok(vendor.shop_tiktok || '')
+      setShopOpen(vendor.shop_open !== false)
+      // Load menu from Supabase
+      const items = await getVendorMenuItems(vendor.id)
+      if (items.length > 0) {
+        setMenuItems(items.map(i => ({ id: i.id, supabaseId: i.id, name: i.name, price: i.price, photo: i.photo_url, desc: i.description, category: i.category, available: i.available })))
+      }
+      localStorage.setItem('indoo_vendor_phone', loginPhone.replace(/[^0-9]/g, ''))
+      localStorage.setItem('indoo_vendor_pass', loginPass)
+      setIsVendor(true); setVendorLogin(false)
+      setLoginPhone(''); setLoginPass(''); setLoginError(''); setLoginMode('login')
+      return
+    }
+    // Fallback to localStorage
     const storedPhone = localStorage.getItem('indoo_vendor_phone') || shopPhone
     const storedPass = localStorage.getItem('indoo_vendor_pass') || 'vendor123'
-    const phoneClean = loginPhone.replace(/[^0-9]/g, '')
-    const storedClean = storedPhone.replace(/[^0-9]/g, '')
-    if (phoneClean === storedClean && loginPass === storedPass) {
-      setIsVendor(true)
-      setVendorLogin(false)
+    if (loginPhone.replace(/[^0-9]/g, '') === storedPhone.replace(/[^0-9]/g, '') && loginPass === storedPass) {
+      setIsVendor(true); setVendorLogin(false)
       setLoginPhone(''); setLoginPass(''); setLoginError(''); setLoginMode('login')
     } else {
       setLoginError('Wrong number or password')
     }
   }
 
-  const handleVendorSignup = () => {
+  const handleVendorSignup = async () => {
     if (!signupName.trim()) { setLoginError('Enter your name'); return }
     if (!loginPhone.trim()) { setLoginError('Enter WhatsApp number'); return }
     if (!loginPass.trim()) { setLoginError('Create a password'); return }
-    if (loginPass.length < 4) { setLoginError('Password must be at least 4 characters'); return }
-    // Save vendor account
-    localStorage.setItem('indoo_vendor_phone', loginPhone.replace(/[^0-9]/g, ''))
-    localStorage.setItem('indoo_vendor_pass', loginPass)
-    localStorage.setItem('vendorbasic_shopName', signupName)
-    localStorage.setItem('vendorbasic_shopPhone', loginPhone.replace(/[^0-9]/g, ''))
-    setShopName(signupName)
-    setShopPhone(loginPhone.replace(/[^0-9]/g, ''))
-    setIsVendor(true)
-    setVendorLogin(false)
-    setLoginPhone(''); setLoginPass(''); setSignupName(''); setLoginError(''); setLoginMode('login')
+    if (loginPass.length < 4) { setLoginError('Password min 4 characters'); return }
+    try {
+      const vendor = await vendorSignup(loginPhone, loginPass, signupName)
+      setVendorId(vendor.id)
+      localStorage.setItem('indoo_vendor_phone', loginPhone.replace(/[^0-9]/g, ''))
+      localStorage.setItem('indoo_vendor_pass', loginPass)
+      setShopName(signupName)
+      setShopPhone(loginPhone.replace(/[^0-9]/g, ''))
+      setIsVendor(true)
+      setVendorLogin(false)
+      setLoginPhone(''); setLoginPass(''); setSignupName(''); setLoginError(''); setLoginMode('login')
+    } catch (e) { setLoginError(e.message || 'Signup failed') }
   }
 
   /* --- Vendor actions --- */
@@ -252,6 +369,8 @@ export default function App() {
   }
 
   const deleteItem = (id) => {
+    const item = menuItems.find(m => m.id === id)
+    if (item?.supabaseId) deleteMenuItemSupa(item.supabaseId).catch(() => {})
     setMenuItems((prev) => prev.filter((m) => m.id !== id))
   }
 
@@ -271,6 +390,7 @@ export default function App() {
         m.id === editItem.id ? { ...m, name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, category: formCategory } : m
       )
     )
+    if (vendorId) saveMenuItem(vendorId, { ...menuItems.find(m => m.id === editItem.id), name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, category: formCategory }).catch(() => {})
     setEditItem(null)
   }
 
@@ -289,6 +409,7 @@ export default function App() {
       ...prev,
       { id: newId, name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, category: formCategory, available: true },
     ])
+    if (vendorId) saveMenuItem(vendorId, { name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, category: formCategory, available: true }).catch(() => {})
     setAddingItem(false)
   }
 
@@ -772,12 +893,17 @@ export default function App() {
               {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
               <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
                 {formPhoto ? 'Change Photo' : '📷 Upload Photo'}
-                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
+                  // Try Supabase storage first
+                  if (supabase && vendorId && !String(vendorId).startsWith('local')) {
+                    const url = await uploadMenuImage(vendorId, file)
+                    if (url) { setFormPhoto(url); return }
+                  }
+                  // Fallback to dataURL
                   const reader = new FileReader()
                   reader.onload = () => {
-                    // Compress via canvas
                     const img = new Image()
                     img.onload = () => {
                       const canvas = document.createElement('canvas')
@@ -823,12 +949,17 @@ export default function App() {
               {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
               <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
                 {formPhoto ? 'Change Photo' : '📷 Upload Photo'}
-                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
+                  // Try Supabase storage first
+                  if (supabase && vendorId && !String(vendorId).startsWith('local')) {
+                    const url = await uploadMenuImage(vendorId, file)
+                    if (url) { setFormPhoto(url); return }
+                  }
+                  // Fallback to dataURL
                   const reader = new FileReader()
                   reader.onload = () => {
-                    // Compress via canvas
                     const img = new Image()
                     img.onload = () => {
                       const canvas = document.createElement('canvas')
@@ -917,7 +1048,10 @@ export default function App() {
               </button>
               <span style={{ fontSize: 15, fontWeight: 600 }}>{shopOpen ? 'Open' : 'Closed'}</span>
             </div>
-            <button style={S.btnGreen} onClick={() => setShopConfig(false)}>Done</button>
+            <button style={S.btnGreen} onClick={() => {
+              if (vendorId) updateVendorConfig(vendorId, { shop_name: shopName, shop_phone: shopPhone, shop_address: shopAddress, shop_hours: shopHours, shop_food_type: shopFoodType, shop_maps_link: shopMapsLink, shop_instagram: shopInstagram, shop_tiktok: shopTiktok, shop_open: shopOpen }).catch(() => {})
+              setShopConfig(false)
+            }}>Done</button>
           </div>
         </div>
       )}
