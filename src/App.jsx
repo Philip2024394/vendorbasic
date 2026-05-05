@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 
-/* ─── Delivery Zones ─── */
+/* ─── Estimated Delivery Costs (based on GoJek/Grab rates) ─── */
 const DELIVERY_ZONES = [
-  { name: 'Free (0-2km)', radius: 2, fee: 0 },
-  { name: '2-5km', radius: 5, fee: 5000 },
-  { name: '5-10km', radius: 10, fee: 8000 },
-  { name: '10-15km', radius: 15, fee: 12000 },
+  { name: 'Pickup', radius: 0, fee: 0, label: 'Pickup / Walk-in' },
+  { name: '0-2 km', radius: 2, fee: 0, label: 'FREE' },
+  { name: '2-5 km', radius: 5, fee: 8000, label: '~Rp 8,000' },
+  { name: '5-10 km', radius: 10, fee: 15000, label: '~Rp 15,000' },
+  { name: '10-15 km', radius: 15, fee: 22000, label: '~Rp 22,000' },
 ]
 
 /* ─── Demo Menu ─── */
@@ -236,19 +237,27 @@ export default function App() {
 
   /* --- WhatsApp order --- */
   const sendWhatsApp = () => {
+    const orderType = payMethod === 'pickup' ? 'Pickup' : 'Delivery'
     const lines = [
-      `*New Order from Street Food*`,
+      `📋 *New Order — ${shopName}*`,
       ``,
-      ...cart.map((c) => `${c.qty}x ${c.name} — ${fmt(c.price * c.qty)}`),
+      `🍽️ *Items:*`,
+      ...cart.map((c) => `• ${c.qty}x ${c.name} — ${fmt(c.price * c.qty)}`),
       ``,
-      `Subtotal: ${fmt(totalPrice)}`,
-      `Delivery: ${fmt(deliveryZone.fee)} (${deliveryZone.name})`,
-      `*Total: ${fmt(totalPrice + deliveryZone.fee)}*`,
+      `💵 *Total: ${fmt(totalPrice)}*`,
       ``,
-      `Name: ${custName}`,
-      `Phone: ${custPhone}`,
-      `Address: ${custAddress}`,
-      `Payment: ${payMethod === 'cod' ? 'Cash on Delivery' : 'Bank Transfer'}`,
+      `📍 *${orderType}*`,
+      ...(payMethod === 'delivery' ? [
+        `Address: ${custAddress}`,
+        ``,
+        `🛵 _Please arrange your own GoJek/Grab for pickup from our location_`,
+      ] : [
+        `_Customer will pick up from your location_`,
+      ]),
+      ``,
+      `👤 ${custName}`,
+      `📱 ${custPhone}`,
+      `💳 Cash on ${orderType}`,
     ]
     const msg = encodeURIComponent(lines.join('\n'))
     const phone = shopPhone.replace(/[^0-9]/g, '')
@@ -447,60 +456,60 @@ export default function App() {
                     </div>
                   ))}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 10, paddingTop: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 4 }}>
-                      <span>Subtotal</span><span>{fmt(totalPrice)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 4 }}>
-                      <span>Delivery ({deliveryZone.name})</span><span>{fmt(deliveryZone.fee)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 700, marginTop: 6 }}>
-                      <span>Total</span><span style={{ color: '#FACC15' }}>{fmt(totalPrice + deliveryZone.fee)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, marginTop: 6 }}>
+                      <span>Food Total</span><span style={{ color: '#FACC15' }}>{fmt(totalPrice)}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Delivery zone picker */}
-                <label style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8, display: 'block' }}>
-                  Delivery Zone {gpsLoading && '(detecting GPS...)'}
-                </label>
-                <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden', marginBottom: 14 }}>
-                  {DELIVERY_ZONES.map((z, i) => (
-                    <button key={z.radius} onClick={() => setDeliveryZone(z)} style={{
-                      width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '14px 16px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                      background: deliveryZone.radius === z.radius ? 'rgba(141,198,63,0.1)' : 'transparent',
-                      borderBottom: i < DELIVERY_ZONES.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      borderLeft: deliveryZone.radius === z.radius ? '3px solid #8DC63F' : '3px solid transparent',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ width: 20, height: 20, borderRadius: '50%', border: deliveryZone.radius === z.radius ? '2px solid #8DC63F' : '2px solid rgba(255,255,255,0.15)', background: deliveryZone.radius === z.radius ? '#8DC63F' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {deliveryZone.radius === z.radius && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }} />}
-                        </span>
-                        <div style={{ textAlign: 'left' }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', display: 'block' }}>{z.name}</span>
-                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Within {z.radius} km</span>
-                        </div>
+                {/* Estimated Delivery Cost */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8, display: 'block' }}>
+                    📍 Estimated Delivery Cost
+                  </label>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' }}>
+                    {DELIVERY_ZONES.map((z, i) => (
+                      <div key={z.radius} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '12px 16px',
+                        borderBottom: i < DELIVERY_ZONES.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                      }}>
+                        <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>{z.name}</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: z.fee === 0 ? '#8DC63F' : '#FACC15' }}>{z.label}</span>
                       </div>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: z.fee === 0 ? '#8DC63F' : '#FACC15' }}>{z.fee === 0 ? 'FREE' : fmt(z.fee)}</span>
-                    </button>
-                  ))}
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8, lineHeight: 1.5 }}>
+                    * Prices based on GoJek/Grab estimates. Order delivery from your preferred app. Vendor address will be in your WhatsApp order.
+                  </p>
+                </div>
+
+                {/* Pickup or Delivery */}
+                <label style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8, display: 'block' }}>Order Type</label>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  <button style={S.payBtn(payMethod === 'pickup')} onClick={() => setPayMethod('pickup')}>🏪 Pickup</button>
+                  <button style={S.payBtn(payMethod === 'delivery')} onClick={() => setPayMethod('delivery')}>🛵 Delivery</button>
                 </div>
 
                 {/* Customer info */}
                 <input style={S.input} placeholder="Your name" value={custName} onChange={(e) => setCustName(e.target.value)} />
-                <input style={S.input} placeholder="Phone number" type="tel" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} />
-                <input style={S.input} placeholder="Delivery address" value={custAddress} onChange={(e) => setCustAddress(e.target.value)} />
+                <input style={S.input} placeholder="Phone / WhatsApp" type="tel" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} />
+                {payMethod === 'delivery' && (
+                  <input style={S.input} placeholder="Delivery address (for GoJek pickup)" value={custAddress} onChange={(e) => setCustAddress(e.target.value)} />
+                )}
 
                 {/* Payment */}
-                <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6, display: 'block' }}>Payment Method</label>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                  <button style={S.payBtn(payMethod === 'cod')} onClick={() => setPayMethod('cod')}>Cash on Delivery</button>
-                  <button style={S.payBtn(payMethod === 'transfer')} onClick={() => setPayMethod('transfer')}>Bank Transfer</button>
+                <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(141,198,63,0.06)', border: '1px solid rgba(141,198,63,0.15)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>💵</span>
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#8DC63F' }}>Cash on Delivery / Pickup</span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', display: 'block' }}>Pay when you receive your food</span>
+                  </div>
                 </div>
 
                 <button
-                  style={{ ...S.btnGreen, opacity: (custName && custPhone && custAddress) ? 1 : 0.4 }}
-                  disabled={!custName || !custPhone || !custAddress}
+                  style={{ ...S.btnGreen, opacity: (custName && custPhone) ? 1 : 0.4 }}
+                  disabled={!custName || !custPhone}
                   onClick={sendWhatsApp}
                 >
                   Place Order via WhatsApp
