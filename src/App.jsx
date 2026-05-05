@@ -11,14 +11,14 @@ const DELIVERY_ZONES = [
 
 /* ─── Demo Menu ─── */
 const DEMO_MENU = [
-  { id: 1, name: 'Nasi Goreng', price: 15000, photo: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=300', desc: 'Fried rice with egg, vegetables, and kecap manis', available: true },
-  { id: 2, name: 'Sate Ayam', price: 18000, photo: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=300', desc: 'Grilled chicken skewers with peanut sauce', available: true },
-  { id: 3, name: 'Bakso', price: 12000, photo: 'https://images.unsplash.com/photo-1555126634-323283e090fa?w=300', desc: 'Meatball soup with noodles and vegetables', available: true },
-  { id: 4, name: 'Mie Goreng', price: 13000, photo: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300', desc: 'Stir-fried noodles with vegetables and egg', available: true },
-  { id: 5, name: 'Ayam Geprek', price: 20000, photo: 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=300', desc: 'Crispy smashed chicken with sambal', available: true },
-  { id: 6, name: 'Es Teh Manis', price: 5000, photo: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300', desc: 'Sweet iced tea', available: true },
-  { id: 7, name: 'Es Jeruk', price: 7000, photo: 'https://images.unsplash.com/photo-1621263764928-df1444c5e859?w=300', desc: 'Fresh orange juice', available: true },
-  { id: 8, name: 'Gorengan', price: 5000, photo: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=300', desc: 'Assorted fried snacks — tempe, tahu, bakwan', available: true },
+  { id: 1, name: 'Nasi Goreng', price: 15000, photo: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=300', desc: 'Fried rice with egg, vegetables, and kecap manis', category: 'Meal', available: true },
+  { id: 2, name: 'Sate Ayam', price: 18000, photo: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=300', desc: 'Grilled chicken skewers with peanut sauce', category: 'Meal', available: true },
+  { id: 3, name: 'Bakso', price: 12000, photo: 'https://images.unsplash.com/photo-1555126634-323283e090fa?w=300', desc: 'Meatball soup with noodles and vegetables', category: 'Meal', available: true },
+  { id: 4, name: 'Mie Goreng', price: 13000, photo: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300', desc: 'Stir-fried noodles with vegetables and egg', category: 'Meal', available: true },
+  { id: 5, name: 'Ayam Geprek', price: 20000, photo: 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=300', desc: 'Crispy smashed chicken with sambal', category: 'Meal', available: true },
+  { id: 6, name: 'Es Teh Manis', price: 5000, photo: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300', desc: 'Sweet iced tea', category: 'Drink', available: true },
+  { id: 7, name: 'Es Jeruk', price: 7000, photo: 'https://images.unsplash.com/photo-1621263764928-df1444c5e859?w=300', desc: 'Fresh orange juice', category: 'Drink', available: true },
+  { id: 8, name: 'Gorengan', price: 5000, photo: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=300', desc: 'Assorted fried snacks — tempe, tahu, bakwan', category: 'Snack', available: true },
 ]
 
 /* ─── Helpers ─── */
@@ -146,6 +146,7 @@ export default function App() {
   /* New / edit item form */
   const [formName, setFormName] = useState('')
   const [formPrice, setFormPrice] = useState('')
+  const [formCategory, setFormCategory] = useState('Meal')
   const [formPhoto, setFormPhoto] = useState('')
   const [formDesc, setFormDesc] = useState('')
 
@@ -241,6 +242,7 @@ export default function App() {
     setFormPrice(String(item.price))
     setFormPhoto(item.photo)
     setFormDesc(item.desc)
+    setFormCategory(item.category || 'Meal')
     setEditItem(item)
   }
 
@@ -248,7 +250,7 @@ export default function App() {
     if (!formName || !formPrice) return
     setMenuItems((prev) =>
       prev.map((m) =>
-        m.id === editItem.id ? { ...m, name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc } : m
+        m.id === editItem.id ? { ...m, name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, category: formCategory } : m
       )
     )
     setEditItem(null)
@@ -267,7 +269,7 @@ export default function App() {
     const newId = Date.now()
     setMenuItems((prev) => [
       ...prev,
-      { id: newId, name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, available: true },
+      { id: newId, name: formName, price: Number(formPrice), photo: formPhoto, desc: formDesc, category: formCategory, available: true },
     ])
     setAddingItem(false)
   }
@@ -408,7 +410,16 @@ export default function App() {
 
       {/* --- Menu --- */}
       <div style={{ paddingBottom: 12 }}>
-        {visibleMenu.map((item) => (
+        {['Meal', 'Drink', 'Dessert', 'Snack'].map(cat => {
+          const catItems = visibleMenu.filter(i => (i.category || 'Meal') === cat)
+          if (catItems.length === 0) return null
+          return (
+            <div key={cat}>
+              <div style={{ padding: '14px 16px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>{cat === 'Meal' ? '🍽️' : cat === 'Drink' ? '🥤' : cat === 'Dessert' ? '🍰' : '🍿'}</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#8DC63F', textTransform: 'uppercase', letterSpacing: 1 }}>{cat}s</span>
+              </div>
+              {catItems.map((item) => (
           <div
             key={item.id}
             style={{ ...S.card, ...((!item.available && isVendor) ? S.unavailable : {}) }}
@@ -442,6 +453,9 @@ export default function App() {
             )}
           </div>
         ))}
+            </div>
+          )
+        })}
 
         {visibleMenu.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>No items on the menu</div>
@@ -714,6 +728,16 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Edit Item</h2>
             <input style={S.input} placeholder="Name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             <input style={S.input} placeholder="Price (number)" type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {['Meal', 'Drink', 'Dessert', 'Snack'].map(cat => (
+                <button key={cat} onClick={() => setFormCategory(cat)} style={{
+                  flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  border: formCategory === cat ? '2px solid #8DC63F' : '1px solid rgba(255,255,255,0.12)',
+                  background: formCategory === cat ? 'rgba(141,198,63,0.15)' : 'transparent',
+                  color: formCategory === cat ? '#8DC63F' : 'rgba(255,255,255,0.5)',
+                }}>{cat}</button>
+              ))}
+            </div>
             <div style={{ marginBottom: 10 }}>
               {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
               <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
@@ -755,6 +779,16 @@ export default function App() {
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Add Item</h2>
             <input style={S.input} placeholder="Name" value={formName} onChange={(e) => setFormName(e.target.value)} />
             <input style={S.input} placeholder="Price (number)" type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {['Meal', 'Drink', 'Dessert', 'Snack'].map(cat => (
+                <button key={cat} onClick={() => setFormCategory(cat)} style={{
+                  flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  border: formCategory === cat ? '2px solid #8DC63F' : '1px solid rgba(255,255,255,0.12)',
+                  background: formCategory === cat ? 'rgba(141,198,63,0.15)' : 'transparent',
+                  color: formCategory === cat ? '#8DC63F' : 'rgba(255,255,255,0.5)',
+                }}>{cat}</button>
+              ))}
+            </div>
             <div style={{ marginBottom: 10 }}>
               {formPhoto && <img src={formPhoto} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', marginBottom: 6 }} />}
               <label style={{ display: 'block', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(141,198,63,0.4)', background: 'rgba(141,198,63,0.05)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
