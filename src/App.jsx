@@ -63,13 +63,13 @@ function getDeliveryFee(distKm) {
 
 /* ─── Styles ─── */
 const S = {
-  page: { background: '#0a0a0a', minHeight: '100vh', color: '#fff', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif', fontSize: 14, paddingBottom: 80 },
+  page: { background: '#0a0a0a', backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', minHeight: '100vh', color: '#fff', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif', fontSize: 14, paddingBottom: 80 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px', position: 'relative' },
   shopLogo: { width: 44, height: 44, borderRadius: 12, objectFit: 'cover', marginRight: 12 },
   shopName: { fontSize: 20, fontWeight: 700, flex: 1 },
   gearBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   vendorBar: { background: 'linear-gradient(135deg,#2d7a0e,#8DC63F)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 },
-  card: { background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: 'none', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative', transition: 'all 0.3s ease' },
+  card: { background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative', transition: 'all 0.3s ease' },
   cardImg: { width: 80, height: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0 },
   cardBody: { flex: 1, minWidth: 0 },
   cardName: { fontSize: 16, fontWeight: 600, marginBottom: 4 },
@@ -119,6 +119,13 @@ export default function App() {
   const [shopLogo, setShopLogo] = useState(() => localStorage.getItem('vendorbasic_shopLogo') || '')
   const [shopPhone, setShopPhone] = useState(() => localStorage.getItem('vendorbasic_shopPhone') || '6281234567890')
   const [shopOpen, setShopOpen] = useState(() => loadJSON('vendorbasic_shopOpen', true))
+  const [shopAddress, setShopAddress] = useState(() => localStorage.getItem('vendorbasic_shopAddress') || 'Jl. Malioboro, Yogyakarta')
+  const [shopHours, setShopHours] = useState(() => localStorage.getItem('vendorbasic_shopHours') || '17:00 – 23:00')
+  const [shopMapsLink, setShopMapsLink] = useState(() => localStorage.getItem('vendorbasic_shopMaps') || '')
+  const [shopInstagram, setShopInstagram] = useState(() => localStorage.getItem('vendorbasic_shopIG') || '')
+  const [shopTiktok, setShopTiktok] = useState(() => localStorage.getItem('vendorbasic_shopTT') || '')
+  const [shopFoodType, setShopFoodType] = useState(() => localStorage.getItem('vendorbasic_shopFoodType') || 'Indonesian & Street Food')
+  const [showLocation, setShowLocation] = useState(false)
 
   /* Checkout form */
   const [custName, setCustName] = useState('')
@@ -145,6 +152,12 @@ export default function App() {
   useEffect(() => { localStorage.setItem('vendorbasic_shopLogo', shopLogo) }, [shopLogo])
   useEffect(() => { localStorage.setItem('vendorbasic_shopPhone', shopPhone) }, [shopPhone])
   useEffect(() => { saveJSON('vendorbasic_shopOpen', shopOpen) }, [shopOpen])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopAddress', shopAddress) }, [shopAddress])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopHours', shopHours) }, [shopHours])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopMaps', shopMapsLink) }, [shopMapsLink])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopIG', shopInstagram) }, [shopInstagram])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopTT', shopTiktok) }, [shopTiktok])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopFoodType', shopFoodType) }, [shopFoodType])
 
   /* --- Cart helpers --- */
   const totalItems = cart.reduce((s, c) => s + c.qty, 0)
@@ -334,13 +347,22 @@ export default function App() {
       <div style={S.header}>
         <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
           {shopLogo && <img src={shopLogo} alt="" style={S.shopLogo} />}
-          <span style={S.shopName}>{shopName}</span>
+          <div>
+            <span style={S.shopName}>{shopName}</span>
+            <span style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginTop: 2 }}>{shopFoodType}</span>
+          </div>
         </div>
-        {!isVendor && (
-          <button style={S.gearBtn} onClick={() => setVendorLogin(true)} aria-label="Vendor login">
-            &#9881;
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Map/location icon */}
+          <button onClick={() => setShowLocation(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 20, cursor: 'pointer', padding: 8, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            📍
           </button>
-        )}
+          {!isVendor && (
+            <button style={S.gearBtn} onClick={() => setVendorLogin(true)} aria-label="Vendor login">
+              &#9881;
+            </button>
+          )}
+        </div>
       </div>
 
       {/* --- Closed banner --- */}
@@ -433,6 +455,83 @@ export default function App() {
               </button>
             )}
             <button style={S.btnOutline} onClick={() => setItemModal(null)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ LOCATION PAGE ═══ */}
+      {showLocation && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 250, background: '#0a0a0a', overflowY: 'auto' }}>
+          {/* Background */}
+          <div style={{ position: 'fixed', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.15, pointerEvents: 'none' }} />
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', position: 'relative', zIndex: 1 }}>
+            <button onClick={() => setShowLocation(false)} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
+            <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Find Us</h2>
+          </div>
+
+          <div style={{ padding: '0 16px 40px', position: 'relative', zIndex: 1 }}>
+            {/* Address */}
+            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <span style={{ fontSize: 24, flexShrink: 0 }}>📍</span>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{shopName}</h3>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{shopAddress}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Hours */}
+            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 24, flexShrink: 0 }}>🕐</span>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Opening Hours</h3>
+                  <p style={{ fontSize: 14, color: '#8DC63F', fontWeight: 700 }}>{shopHours}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Phone */}
+            <a href={`https://wa.me/${shopPhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'block', background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12, textDecoration: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 24, flexShrink: 0 }}>📱</span>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4 }}>WhatsApp</h3>
+                  <p style={{ fontSize: 14, color: '#8DC63F', fontWeight: 700 }}>{shopPhone}</p>
+                </div>
+              </div>
+            </a>
+
+            {/* Google Maps */}
+            {shopMapsLink && (
+              <a href={shopMapsLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', background: 'rgba(141,198,63,0.08)', border: '1px solid rgba(141,198,63,0.2)', borderRadius: 16, padding: 20, marginBottom: 12, textDecoration: 'none', textAlign: 'center' }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#8DC63F' }}>📍 Open in Google Maps</span>
+              </a>
+            )}
+
+            {/* Social Links */}
+            {(shopInstagram || shopTiktok) && (
+              <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Follow Us</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {shopInstagram && (
+                    <a href={`https://instagram.com/${shopInstagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                      <span style={{ fontSize: 20 }}>📸</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#E1306C' }}>@{shopInstagram.replace('@', '')}</span>
+                    </a>
+                  )}
+                  {shopTiktok && (
+                    <a href={`https://tiktok.com/@${shopTiktok.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                      <span style={{ fontSize: 20 }}>🎵</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>@{shopTiktok.replace('@', '')}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -596,6 +695,18 @@ export default function App() {
             <input style={S.input} value={shopLogo} onChange={(e) => setShopLogo(e.target.value)} />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>WhatsApp Number (with country code)</label>
             <input style={S.input} value={shopPhone} onChange={(e) => setShopPhone(e.target.value)} />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Food Type / Description</label>
+            <input style={S.input} value={shopFoodType} onChange={(e) => setShopFoodType(e.target.value)} placeholder="e.g. Indonesian & Street Food" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Stall Address</label>
+            <input style={S.input} value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} placeholder="Jl. Malioboro, depan Bank BCA" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Opening Hours</label>
+            <input style={S.input} value={shopHours} onChange={(e) => setShopHours(e.target.value)} placeholder="17:00 – 23:00" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Google Maps Link</label>
+            <input style={S.input} value={shopMapsLink} onChange={(e) => setShopMapsLink(e.target.value)} placeholder="Paste Google Maps link" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Instagram Username</label>
+            <input style={S.input} value={shopInstagram} onChange={(e) => setShopInstagram(e.target.value)} placeholder="nasigorengpakjoko" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>TikTok Username</label>
+            <input style={S.input} value={shopTiktok} onChange={(e) => setShopTiktok(e.target.value)} placeholder="nasigorengpakjoko" />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Shop Status</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <button style={S.toggle(shopOpen)} onClick={() => setShopOpen(!shopOpen)}>
