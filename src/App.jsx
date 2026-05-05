@@ -140,6 +140,8 @@ export default function App() {
   const [loginPhone, setLoginPhone] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [loginMode, setLoginMode] = useState('login') // 'login' or 'signup'
+  const [signupName, setSignupName] = useState('')
 
   /* New / edit item form */
   const [formName, setFormName] = useState('')
@@ -202,12 +204,27 @@ export default function App() {
     if (phoneClean === storedClean && loginPass === storedPass) {
       setIsVendor(true)
       setVendorLogin(false)
-      setLoginPhone('')
-      setLoginPass('')
-      setLoginError('')
+      setLoginPhone(''); setLoginPass(''); setLoginError(''); setLoginMode('login')
     } else {
       setLoginError('Wrong number or password')
     }
+  }
+
+  const handleVendorSignup = () => {
+    if (!signupName.trim()) { setLoginError('Enter your name'); return }
+    if (!loginPhone.trim()) { setLoginError('Enter WhatsApp number'); return }
+    if (!loginPass.trim()) { setLoginError('Create a password'); return }
+    if (loginPass.length < 4) { setLoginError('Password must be at least 4 characters'); return }
+    // Save vendor account
+    localStorage.setItem('indoo_vendor_phone', loginPhone.replace(/[^0-9]/g, ''))
+    localStorage.setItem('indoo_vendor_pass', loginPass)
+    localStorage.setItem('vendorbasic_shopName', signupName)
+    localStorage.setItem('vendorbasic_shopPhone', loginPhone.replace(/[^0-9]/g, ''))
+    setShopName(signupName)
+    setShopPhone(loginPhone.replace(/[^0-9]/g, ''))
+    setIsVendor(true)
+    setVendorLogin(false)
+    setLoginPhone(''); setLoginPass(''); setSignupName(''); setLoginError(''); setLoginMode('login')
   }
 
   /* --- Vendor actions --- */
@@ -295,7 +312,7 @@ export default function App() {
       {showLanding && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, overflow: 'hidden' }}>
           {/* Background image */}
-          <img src="https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%205,%202026,%2007_57_10%20AM.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
+          <img src="https://ik.imagekit.io/nepgaxllc/Untitleddsasdaaaa.png" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
 
           {/* Header — language + vendor login */}
           <div style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -421,7 +438,7 @@ export default function App() {
 
             {/* Add button (customer) */}
             {!isVendor && shopOpen && item.available && (
-              <button style={S.addBtn} onClick={() => addToCart(item)}>+</button>
+              <button style={S.addBtn} onClick={() => { setItemModal(item); setModalQty(1) }}>+</button>
             )}
           </div>
         ))}
@@ -657,29 +674,34 @@ export default function App() {
 
       {/* ═══ VENDOR LOGIN MODAL ═══ */}
       {vendorLogin && (
-        <div style={S.overlay} onClick={() => setVendorLogin(false)}>
-          <div style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderRadius: 12, maxWidth: 260, width: '85%', padding: '14px 14px 10px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setVendorLogin(false)} style={{ position: 'absolute', top: 6, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 16, cursor: 'pointer' }}>&times;</button>
-            <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 8, textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>Vendor Login</h3>
-            <input
-              style={{ ...S.input, fontSize: 13, padding: '8px 10px', marginBottom: 6 }}
-              type="tel"
-              placeholder="WhatsApp number"
-              value={loginPhone}
-              onChange={(e) => setLoginPhone(e.target.value)}
-            />
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                style={{ ...S.input, fontSize: 13, padding: '8px 10px', marginBottom: 0, flex: 1 }}
-                type="password"
-                placeholder="Password"
-                value={loginPass}
-                onChange={(e) => setLoginPass(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleVendorLogin()}
-              />
-              <button style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: '#8DC63F', color: '#000', fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleVendorLogin}>Go</button>
-            </div>
-            {loginError && <div style={{ color: '#ff6b6b', fontSize: 12, marginTop: 4 }}>{loginError}</div>}
+        <div style={{ ...S.overlay, alignItems: 'center' }} onClick={() => { setVendorLogin(false); setLoginMode('login'); setLoginError('') }}>
+          <div style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderRadius: 14, maxWidth: 270, width: '88%', padding: '16px 14px 12px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => { setVendorLogin(false); setLoginMode('login'); setLoginError('') }} style={{ position: 'absolute', top: 6, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 16, cursor: 'pointer' }}>&times;</button>
+
+            {loginMode === 'login' ? (
+              <>
+                <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, textAlign: 'center', color: '#fff' }}>Sign In</h3>
+                <input style={{ ...S.input, fontSize: 13, padding: '10px 12px', marginBottom: 6 }} type="tel" placeholder="WhatsApp number" value={loginPhone} onChange={(e) => setLoginPhone(e.target.value)} />
+                <input style={{ ...S.input, fontSize: 13, padding: '10px 12px', marginBottom: 6 }} type="password" placeholder="Password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleVendorLogin()} />
+                {loginError && <div style={{ color: '#ff6b6b', fontSize: 12, marginBottom: 6 }}>{loginError}</div>}
+                <button style={{ ...S.btnGreen, padding: '10px', fontSize: 14, marginTop: 0 }} onClick={handleVendorLogin}>Sign In</button>
+                <button onClick={() => { setLoginMode('signup'); setLoginError('') }} style={{ width: '100%', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer', marginTop: 8, padding: 4 }}>
+                  Don't have an account? <span style={{ color: '#8DC63F', fontWeight: 700 }}>Create Account</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, textAlign: 'center', color: '#fff' }}>Create Account</h3>
+                <input style={{ ...S.input, fontSize: 13, padding: '10px 12px', marginBottom: 6 }} type="text" placeholder="Your name / business name" value={signupName} onChange={(e) => setSignupName(e.target.value)} />
+                <input style={{ ...S.input, fontSize: 13, padding: '10px 12px', marginBottom: 6 }} type="tel" placeholder="WhatsApp number" value={loginPhone} onChange={(e) => setLoginPhone(e.target.value)} />
+                <input style={{ ...S.input, fontSize: 13, padding: '10px 12px', marginBottom: 6 }} type="password" placeholder="Create password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleVendorSignup()} />
+                {loginError && <div style={{ color: '#ff6b6b', fontSize: 12, marginBottom: 6 }}>{loginError}</div>}
+                <button style={{ ...S.btnGreen, padding: '10px', fontSize: 14, marginTop: 0 }} onClick={handleVendorSignup}>Create Account</button>
+                <button onClick={() => { setLoginMode('login'); setLoginError('') }} style={{ width: '100%', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer', marginTop: 8, padding: 4 }}>
+                  Already have an account? <span style={{ color: '#8DC63F', fontWeight: 700 }}>Sign In</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
