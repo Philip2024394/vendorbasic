@@ -8,15 +8,60 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Street Food</title>
+    <title>Street Local — Street Vendor</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body, #root { background: #0a0a0a; min-height: 100%; }
-      body { overflow-x: hidden; }
+      html, body { height: 100%; width: 100%; background: #0a0a0a; }
+      body { display: flex; justify-content: center; align-items: center; overflow: hidden; }
+      #app-shell {
+        width: 100%;
+        max-width: 480px;
+        height: 100vh;
+        max-height: 100vh;
+        position: relative;
+        background: #1a0e05;
+        overflow-y: auto;
+        overflow-x: hidden;
+        transform: translateZ(0);
+        contain: paint layout;
+      }
+      #app-bg {
+        position: sticky;
+        top: 0;
+        width: 100%;
+        height: 100vh;
+        margin-bottom: -100vh;
+        z-index: 0;
+        pointer-events: none;
+        background: url('https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_19_01%20PM.png') center/cover no-repeat;
+        background-size: 100% 100%;
+      }
+      #root { width: 100%; min-height: 100%; padding-top: env(safe-area-inset-top, 0px); position: relative; z-index: 1; }
+      * { scrollbar-width: none; -ms-overflow-style: none; }
+      *::-webkit-scrollbar { display: none; }
+      @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      @media (min-width: 481px) {
+        #app-shell {
+          border-left: 1px solid rgba(255,255,255,0.06);
+          border-right: 1px solid rgba(255,255,255,0.06);
+          box-shadow: 0 0 80px rgba(0,0,0,0.5);
+        }
+      }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="app-shell">
+      <div id="app-bg"></div>
+      <div id="root"></div>
+    </div>
+    <script>
+      // Load saved theme background on startup
+      var savedBg = localStorage.getItem('vendorbasic_themeBg');
+      if (savedBg) {
+        var bg = document.getElementById('app-bg');
+        if (bg) bg.style.backgroundImage = 'url(' + savedBg + ')';
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

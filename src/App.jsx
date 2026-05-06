@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import AdminDashboard from './AdminDashboard'
 import ActivatePage from './ActivatePage'
+import { useAppLocale, LANGUAGES } from './i18n'
 
 /* ─── Supabase Vendor Service ─── */
 async function vendorSignup(phone, password, name) {
@@ -94,14 +95,27 @@ async function uploadMenuImage(vendorId, file) {
   return data?.publicUrl || null
 }
 
-/* ─── Estimated Delivery Costs (based on GoJek/Grab rates) ─── */
-const DELIVERY_ZONES = [
-  { name: 'Pickup', radius: 0, fee: 0, label: 'Pickup / Walk-in' },
-  { name: '0-2 km', radius: 2, fee: 0, label: 'FREE' },
-  { name: '2-5 km', radius: 5, fee: 8000, label: '~Rp 8,000' },
-  { name: '5-10 km', radius: 10, fee: 15000, label: '~Rp 15,000' },
-  { name: '10-15 km', radius: 15, fee: 22000, label: '~Rp 22,000' },
-]
+/* ─── Estimated Delivery Costs — built from admin settings ─── */
+function buildDeliveryZones(minCharge = 7000, minKm = 2, perKm = 2500, maxKm = 15, roundTo = 1000, currency = 'Rp') {
+  // minCharge covers 0 to minKm (flat fee)
+  // After minKm, each additional km adds perKm
+  const calc = (km) => {
+    if (km <= minKm) return minCharge
+    const extra = km - minKm
+    return Math.ceil((minCharge + extra * perKm) / roundTo) * roundTo
+  }
+  const zones = [
+    { name: 'Pickup', radius: 0, fee: 0, label: 'Pickup / Walk-in' },
+    { name: `0-${minKm} km`, radius: minKm, fee: minCharge, label: `~${currency} ${minCharge.toLocaleString()}` },
+  ]
+  if (maxKm > minKm) zones.push({ name: `${minKm}-5 km`, radius: 5, fee: calc(5), label: `~${currency} ${calc(5).toLocaleString()}` })
+  if (maxKm > 5) zones.push({ name: '5-10 km', radius: 10, fee: calc(10), label: `~${currency} ${calc(10).toLocaleString()}` })
+  if (maxKm > 10) zones.push({ name: '10-15 km', radius: 15, fee: calc(15), label: `~${currency} ${calc(15).toLocaleString()}` })
+  if (maxKm > 15) zones.push({ name: '15-20 km', radius: 20, fee: calc(20), label: `~${currency} ${calc(20).toLocaleString()}` })
+  return zones
+}
+
+const DEFAULT_DELIVERY_ZONES = buildDeliveryZones()
 
 /* ─── Food Type Categories ─── */
 const FOOD_TYPES = {
@@ -163,39 +177,38 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 const SHOP_LAT = -7.7956
 const SHOP_LON = 110.3695
 
-function getDeliveryFee(distKm) {
-  for (let i = DELIVERY_ZONES.length - 1; i >= 0; i--) {
-    if (distKm <= DELIVERY_ZONES[i].radius) {
-      return DELIVERY_ZONES[i]
-    }
+function getDeliveryFee(distKm, zones) {
+  const z = zones || DEFAULT_DELIVERY_ZONES
+  for (let i = z.length - 1; i >= 0; i--) {
+    if (distKm <= z[i].radius) return z[i]
   }
-  return DELIVERY_ZONES[DELIVERY_ZONES.length - 1]
+  return z[z.length - 1]
 }
 
 /* ─── Styles ─── */
 const S = {
-  page: { background: '#0a0a0a', backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', minHeight: '100vh', color: '#fff', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif', fontSize: 14, paddingBottom: 80 },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px', position: 'relative' },
+  page: { background: 'transparent', minHeight: '100%', color: '#fff', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif', fontSize: 14, paddingBottom: 80, position: 'relative' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px', position: 'sticky', top: 0, zIndex: 10 },
   shopLogo: { width: 44, height: 44, borderRadius: 12, objectFit: 'cover', marginRight: 12 },
-  shopName: { fontSize: 20, fontWeight: 700, flex: 1 },
+  shopName: { fontSize: 20, fontWeight: 700, flex: 1, textShadow: '0 2px 8px rgba(0,0,0,0.7), 0 0 16px rgba(0,0,0,0.4)' },
   gearBtn: { background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  vendorBar: { background: 'linear-gradient(135deg,#2d7a0e,#8DC63F)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14, fontWeight: 600 },
+  vendorBar: { background: 'transparent', padding: '4px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 },
   card: { background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: 16, margin: '8px 12px', padding: 12, display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative', transition: 'all 0.3s ease' },
   cardImg: { width: 80, height: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0 },
   cardBody: { flex: 1, minWidth: 0 },
-  cardName: { fontSize: 16, fontWeight: 600, marginBottom: 4 },
-  cardDesc: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6, lineHeight: 1.4 },
+  cardName: { fontSize: 18, fontWeight: 600, marginBottom: 4 },
+  cardDesc: { fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 6, lineHeight: 1.4 },
   cardPrice: { fontSize: 16, fontWeight: 700, color: '#FACC15' },
   addBtn: { position: 'absolute', right: 12, bottom: 12, width: 36, height: 36, borderRadius: 18, background: '#8DC63F', border: 'none', color: '#fff', fontSize: 22, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   stickyCart: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'linear-gradient(135deg,#2d7a0e,#8DC63F)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, minHeight: 56 },
   cartText: { fontSize: 15, fontWeight: 600 },
   checkoutBtn: { background: '#fff', color: '#2d7a0e', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 200, overflowY: 'auto', display: 'flex', justifyContent: 'center' },
+  overlay: { position: 'fixed', inset: 0, background: '#0a0a0a', zIndex: 200, overflowY: 'auto', display: 'flex', justifyContent: 'center' },
   modal: { background: '#111', borderRadius: 20, maxWidth: 420, width: '100%', margin: '24px 12px', padding: 20, position: 'relative', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' },
   input: { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 15, outline: 'none', marginBottom: 10, boxSizing: 'border-box' },
   btnGreen: { width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: '#8DC63F', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginTop: 8 },
   btnOutline: { width: '100%', padding: '14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer', marginTop: 8 },
-  closeBtnX: { position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  closeBtnX: { position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: '#8B0000', fontSize: 24, cursor: 'pointer', minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   unavailable: { opacity: 0.4, filter: 'grayscale(1)' },
   toggle: (on) => ({ width: 48, height: 26, borderRadius: 13, background: on ? '#8DC63F' : 'rgba(255,255,255,0.15)', position: 'relative', cursor: 'pointer', border: 'none', flexShrink: 0, transition: 'background 0.2s' }),
   toggleDot: (on) => ({ position: 'absolute', top: 3, left: on ? 24 : 3, width: 20, height: 20, borderRadius: 10, background: '#fff', transition: 'left 0.2s' }),
@@ -204,7 +217,7 @@ const S = {
   fab: { position: 'fixed', bottom: 90, right: 16, width: 56, height: 56, borderRadius: 28, background: '#8DC63F', border: 'none', color: '#fff', fontSize: 28, fontWeight: 700, cursor: 'pointer', zIndex: 90, boxShadow: '0 4px 20px rgba(141,198,63,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   closedBanner: { background: 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.3)', borderRadius: 12, margin: '8px 12px', padding: '12px 16px', textAlign: 'center', color: '#ff6b6b', fontSize: 15, fontWeight: 600 },
   qtyRow: { display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center', margin: '16px 0' },
-  qtyBtn: { width: 44, height: 44, borderRadius: 22, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { width: 44, height: 44, borderRadius: 22, border: 'none', background: '#1a1a1a', color: '#FFD600', fontSize: 22, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   qtyNum: { fontSize: 20, fontWeight: 700, minWidth: 30, textAlign: 'center' },
   zoneBtn: (active) => ({ flex: 1, padding: '10px 6px', borderRadius: 10, border: active ? '2px solid #8DC63F' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(141,198,63,0.15)' : 'transparent', color: '#fff', fontSize: 13, cursor: 'pointer', textAlign: 'center' }),
   payBtn: (active) => ({ flex: 1, padding: '14px', borderRadius: 14, border: active ? '2px solid #8DC63F' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(141,198,63,0.15)' : 'transparent', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', textAlign: 'center' }),
@@ -219,6 +232,27 @@ export default function App() {
   if (viewMode === 'admin') return <AdminDashboard />
   if (viewMode === 'activate') return <ActivatePage />
 
+  /* --- i18n --- */
+  const { locale, setLocale, t, nativeLang } = useAppLocale()
+
+  /* --- Check vendor activation status for public visitors --- */
+  const [publicVendorStatus, setPublicVendorStatus] = useState(null)
+  const [publicVendorName, setPublicVendorName] = useState('')
+  const [publicVendorLogo, setPublicVendorLogo] = useState('')
+  useEffect(() => {
+    // Check if this is a vendor's public page (has slug in URL or stored vendor ID)
+    const storedId = localStorage.getItem('vendorbasic_vendorId')
+    if (storedId && !String(storedId).startsWith('local') && supabase) {
+      supabase.from('vendor_accounts').select('status,shop_name,shop_logo').eq('id', storedId).single().then(({ data }) => {
+        if (data) {
+          setPublicVendorStatus(data.status || 'pending')
+          setPublicVendorName(data.shop_name || '')
+          setPublicVendorLogo(data.shop_logo || '')
+        }
+      })
+    }
+  }, [])
+
   /* --- State --- */
   const [showLanding, setShowLanding] = useState(true)
   const [menuItems, setMenuItems] = useState(() => loadJSON('vendorbasic_menu', DEMO_MENU))
@@ -231,6 +265,17 @@ export default function App() {
   const [editItem, setEditItem] = useState(null) // item being edited by vendor
   const [addingItem, setAddingItem] = useState(false)
   const [shopConfig, setShopConfig] = useState(false) // show shop config
+  const [showDeliverySettings, setShowDeliverySettings] = useState(false)
+  const [vendorDrawer, setVendorDrawer] = useState(false)
+  const [shopTheme, setShopTheme] = useState(() => localStorage.getItem('vendorbasic_theme') || 'default')
+  const [delBaseFee, setDelBaseFee] = useState(() => parseInt(localStorage.getItem('vendorbasic_delBase')) || 5000)
+  const [delPerKm, setDelPerKm] = useState(() => parseInt(localStorage.getItem('vendorbasic_delPerKm')) || 2500)
+  const [delMinCharge, setDelMinCharge] = useState(() => parseInt(localStorage.getItem('vendorbasic_delMin')) || 7000)
+  const [delMaxKm, setDelMaxKm] = useState(() => parseInt(localStorage.getItem('vendorbasic_delMax')) || 15)
+  const [delFreeAbove, setDelFreeAbove] = useState(() => parseInt(localStorage.getItem('vendorbasic_delFree')) || 0)
+  const [delCurrency, setDelCurrency] = useState(() => localStorage.getItem('vendorbasic_delCurrency') || 'Rp')
+  const [delMinKm, setDelMinKm] = useState(() => parseInt(localStorage.getItem('vendorbasic_delMinKm')) || 2)
+  const [delEnabled, setDelEnabled] = useState(() => localStorage.getItem('vendorbasic_delEnabled') !== 'false')
 
   /* Shop info */
   const [shopName, setShopName] = useState(() => localStorage.getItem('vendorbasic_shopName') || 'Street Food')
@@ -242,16 +287,27 @@ export default function App() {
   const [shopMapsLink, setShopMapsLink] = useState(() => localStorage.getItem('vendorbasic_shopMaps') || '')
   const [shopInstagram, setShopInstagram] = useState(() => localStorage.getItem('vendorbasic_shopIG') || '')
   const [shopTiktok, setShopTiktok] = useState(() => localStorage.getItem('vendorbasic_shopTT') || '')
+  const [shopFacebook, setShopFacebook] = useState(() => localStorage.getItem('vendorbasic_shopFB') || '')
+  const [shopYoutube, setShopYoutube] = useState(() => localStorage.getItem('vendorbasic_shopYT') || '')
+  const [shopWebsite, setShopWebsite] = useState(() => localStorage.getItem('vendorbasic_shopWeb') || '')
   const [shopFoodType, setShopFoodType] = useState(() => localStorage.getItem('vendorbasic_shopFoodType') || 'Indonesian & Street Food')
   const [showLocation, setShowLocation] = useState(false)
   const [locationSuggestions, setLocationSuggestions] = useState([])
+  const [userDistance, setUserDistance] = useState(null)
+  const [showDeals, setShowDeals] = useState(false)
+  const [dailyDeals, setDailyDeals] = useState(() => loadJSON('vendorbasic_dailyDeals', []))
+  const [showCustomers, setShowCustomers] = useState(false)
+  const [installDismissed, setInstallDismissed] = useState(() => localStorage.getItem('vendorbasic_installDismissed') === 'true')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [promoMsg, setPromoMsg] = useState('')
 
   /* Checkout form */
   const [custName, setCustName] = useState('')
   const [custPhone, setCustPhone] = useState('')
   const [custAddress, setCustAddress] = useState('')
   const [payMethod, setPayMethod] = useState('cod')
-  const [deliveryZone, setDeliveryZone] = useState(DELIVERY_ZONES[0])
+  const [deliveryZones, setDeliveryZones] = useState(DEFAULT_DELIVERY_ZONES)
+  const [deliveryZone, setDeliveryZone] = useState(DEFAULT_DELIVERY_ZONES[0])
   const [gpsLoading, setGpsLoading] = useState(false)
   const [orderDone, setOrderDone] = useState(false)
 
@@ -265,6 +321,36 @@ export default function App() {
   const [vendorStatus, setVendorStatus] = useState(null) // 'active' | 'expired' | 'pending'
   const [vendorExpiresAt, setVendorExpiresAt] = useState(null)
 
+  /* Auto-detect user distance */
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const d = haversineKm(SHOP_LAT, SHOP_LON, pos.coords.latitude, pos.coords.longitude)
+        setUserDistance(Math.round(d * 10) / 10)
+      },
+      () => {}
+    )
+  }, [])
+
+  /* Load delivery rates from admin settings (Supabase) */
+  useEffect(() => {
+    if (!supabase) return
+    async function loadRates() {
+      try {
+        const { data } = await supabase.from('admin_settings').select('id,value').in('id', ['delivery_base_fee', 'delivery_per_km', 'delivery_min_charge', 'delivery_max_km', 'delivery_round_to'])
+        if (data && data.length > 0) {
+          const r = {}
+          data.forEach(d => { r[d.id] = Number(d.value) })
+          const zones = buildDeliveryZones(r.delivery_base_fee, r.delivery_per_km, r.delivery_min_charge, r.delivery_max_km, r.delivery_round_to)
+          setDeliveryZones(zones)
+          setDeliveryZone(zones[0])
+        }
+      } catch (e) { console.warn('Failed to load delivery rates:', e) }
+    }
+    loadRates()
+  }, [])
+
   /* New / edit item form */
   const [formName, setFormName] = useState('')
   const [formPrice, setFormPrice] = useState('')
@@ -272,7 +358,7 @@ export default function App() {
   const [formPhoto, setFormPhoto] = useState('')
   const [formDesc, setFormDesc] = useState('')
 
-  /* --- Persist menu --- */
+  /* --- Persist to localStorage + sync to Supabase --- */
   useEffect(() => { if (vendorId) localStorage.setItem('vendorbasic_vendorId', vendorId) }, [vendorId])
   useEffect(() => { saveJSON('vendorbasic_menu', menuItems) }, [menuItems])
   useEffect(() => { localStorage.setItem('vendorbasic_shopName', shopName) }, [shopName])
@@ -284,7 +370,75 @@ export default function App() {
   useEffect(() => { localStorage.setItem('vendorbasic_shopMaps', shopMapsLink) }, [shopMapsLink])
   useEffect(() => { localStorage.setItem('vendorbasic_shopIG', shopInstagram) }, [shopInstagram])
   useEffect(() => { localStorage.setItem('vendorbasic_shopTT', shopTiktok) }, [shopTiktok])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopFB', shopFacebook) }, [shopFacebook])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopYT', shopYoutube) }, [shopYoutube])
+  useEffect(() => { localStorage.setItem('vendorbasic_shopWeb', shopWebsite) }, [shopWebsite])
   useEffect(() => { localStorage.setItem('vendorbasic_shopFoodType', shopFoodType) }, [shopFoodType])
+  useEffect(() => { localStorage.setItem('vendorbasic_delBase', delBaseFee) }, [delBaseFee])
+  useEffect(() => { localStorage.setItem('vendorbasic_delPerKm', delPerKm) }, [delPerKm])
+  useEffect(() => { localStorage.setItem('vendorbasic_delMin', delMinCharge) }, [delMinCharge])
+  useEffect(() => { localStorage.setItem('vendorbasic_delMax', delMaxKm) }, [delMaxKm])
+  useEffect(() => { localStorage.setItem('vendorbasic_delFree', delFreeAbove) }, [delFreeAbove])
+  useEffect(() => { localStorage.setItem('vendorbasic_delCurrency', delCurrency) }, [delCurrency])
+  useEffect(() => { localStorage.setItem('vendorbasic_delMinKm', delMinKm) }, [delMinKm])
+  useEffect(() => { localStorage.setItem('vendorbasic_delEnabled', delEnabled) }, [delEnabled])
+
+  // Build delivery zones from vendor's own settings
+  useEffect(() => {
+    const zones = buildDeliveryZones(delMinCharge, delMinKm, delPerKm, delMaxKm, 1000, delCurrency)
+    setDeliveryZones(zones)
+    setDeliveryZone(zones[0])
+  }, [delMinCharge, delMinKm, delPerKm, delMaxKm, delCurrency])
+
+  // Sync shop config to Supabase when vendor changes settings
+  const syncTimer = useRef(null)
+  useEffect(() => {
+    if (!vendorId || String(vendorId).startsWith('local')) return
+    clearTimeout(syncTimer.current)
+    syncTimer.current = setTimeout(() => {
+      updateVendorConfig(vendorId, {
+        shop_name: shopName, shop_logo: shopLogo, shop_phone: shopPhone,
+        shop_open: shopOpen, shop_address: shopAddress, shop_hours: shopHours,
+        shop_maps_link: shopMapsLink, shop_instagram: shopInstagram,
+        shop_tiktok: shopTiktok, shop_facebook: shopFacebook,
+        shop_youtube: shopYoutube, shop_website: shopWebsite,
+        shop_food_type: shopFoodType,
+        delivery_base_fee: delBaseFee, delivery_per_km: delPerKm,
+        delivery_min_charge: delMinCharge, delivery_max_km: delMaxKm,
+        delivery_free_above: delFreeAbove, delivery_currency: delCurrency,
+        delivery_enabled: delEnabled,
+      })
+    }, 2000)
+  }, [shopName, shopLogo, shopPhone, shopOpen, shopAddress, shopHours, shopMapsLink, shopInstagram, shopTiktok, shopFacebook, shopYoutube, shopWebsite, shopFoodType, delBaseFee, delPerKm, delMinCharge, delMaxKm, delFreeAbove, delCurrency, delEnabled])
+
+  // Load shop config from Supabase on vendor login
+  useEffect(() => {
+    if (!vendorId || String(vendorId).startsWith('local')) return
+    if (!supabase) return
+    supabase.from('vendor_accounts').select('*').eq('id', vendorId).single().then(({ data }) => {
+      if (!data) return
+      if (data.shop_name) setShopName(data.shop_name)
+      if (data.shop_logo) setShopLogo(data.shop_logo)
+      if (data.shop_phone) setShopPhone(data.shop_phone)
+      if (data.shop_address) setShopAddress(data.shop_address)
+      if (data.shop_hours) setShopHours(data.shop_hours)
+      if (data.shop_maps_link) setShopMapsLink(data.shop_maps_link)
+      if (data.shop_instagram) setShopInstagram(data.shop_instagram)
+      if (data.shop_tiktok) setShopTiktok(data.shop_tiktok)
+      if (data.shop_facebook) setShopFacebook(data.shop_facebook)
+      if (data.shop_youtube) setShopYoutube(data.shop_youtube)
+      if (data.shop_website) setShopWebsite(data.shop_website)
+      if (data.shop_food_type) setShopFoodType(data.shop_food_type)
+      if (data.shop_open !== undefined) setShopOpen(data.shop_open)
+      if (data.delivery_base_fee) setDelBaseFee(data.delivery_base_fee)
+      if (data.delivery_per_km) setDelPerKm(data.delivery_per_km)
+      if (data.delivery_min_charge) setDelMinCharge(data.delivery_min_charge)
+      if (data.delivery_max_km) setDelMaxKm(data.delivery_max_km)
+      if (data.delivery_free_above !== undefined) setDelFreeAbove(data.delivery_free_above)
+      if (data.delivery_currency) setDelCurrency(data.delivery_currency)
+      if (data.delivery_enabled !== undefined) setDelEnabled(data.delivery_enabled)
+    })
+  }, [vendorId])
 
   /* --- Cart helpers --- */
   const totalItems = cart.reduce((s, c) => s + c.qty, 0)
@@ -309,7 +463,7 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const dist = haversineKm(SHOP_LAT, SHOP_LON, pos.coords.latitude, pos.coords.longitude)
-        setDeliveryZone(getDeliveryFee(dist))
+        setDeliveryZone(getDeliveryFee(dist, deliveryZones))
         setGpsLoading(false)
       },
       () => setGpsLoading(false),
@@ -333,6 +487,9 @@ export default function App() {
       setShopMapsLink(vendor.shop_maps_link || '')
       setShopInstagram(vendor.shop_instagram || '')
       setShopTiktok(vendor.shop_tiktok || '')
+      setShopFacebook(vendor.shop_facebook || '')
+      setShopYoutube(vendor.shop_youtube || '')
+      setShopWebsite(vendor.shop_website || '')
       setShopOpen(vendor.shop_open !== false)
       // Set subscription status
       if (vendor.status) setVendorStatus(vendor.status)
@@ -460,42 +617,67 @@ export default function App() {
     const msg = encodeURIComponent(lines.join('\n'))
     const phone = shopPhone.replace(/[^0-9]/g, '')
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank')
+    // Save customer to directory (localStorage + Supabase)
+    const customers = loadJSON('vendorbasic_customers', [])
+    const existing = customers.find(c => c.phone === custPhone)
+    if (existing) {
+      existing.orders = (existing.orders || 0) + 1
+      existing.totalSpent = (existing.totalSpent || 0) + totalPrice
+      existing.lastOrder = new Date().toISOString()
+      existing.name = custName || existing.name
+    } else {
+      customers.push({ phone: custPhone, name: custName, orders: 1, totalSpent: totalPrice, lastOrder: new Date().toISOString(), firstOrder: new Date().toISOString() })
+    }
+    saveJSON('vendorbasic_customers', customers)
+    // Sync to Supabase
+    if (supabase && vendorId && !String(vendorId).startsWith('local')) {
+      supabase.from('vendor_customers').upsert({
+        vendor_id: vendorId, phone: custPhone, name: custName,
+        orders: existing ? existing.orders : 1,
+        total_spent: existing ? existing.totalSpent : totalPrice,
+        last_order: new Date().toISOString(),
+      }, { onConflict: 'vendor_id,phone' }).then(() => {})
+      // Save order
+      supabase.from('vendor_orders').insert({
+        vendor_id: vendorId, customer_name: custName, customer_phone: custPhone,
+        items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+        subtotal: totalPrice, delivery_type: payMethod, payment_method: 'cod',
+        note: document.getElementById('orderNote')?.value || '',
+      }).then(() => {})
+    }
     setOrderDone(true)
   }
 
   /* --- Visible menu --- */
   const visibleMenu = isVendor ? menuItems : menuItems.filter((m) => m.available)
 
+  // Active daily deals — filter by current time
+  const activeDeals = dailyDeals.filter(d => {
+    if (!d.active) return false
+    const now = new Date()
+    const today = now.toISOString().slice(0, 10)
+    const start = new Date(`${today}T${d.startTime || '00:00'}`)
+    const end = new Date(`${today}T${d.endTime || '23:59'}`)
+    return now >= start && now <= end
+  })
+  const hasDeals = activeDeals.length > 0
+
   /* ═══════════════════════ RENDER ═══════════════════════ */
   return (
     <div style={S.page}>
+
       {/* ═══ LANDING PAGE ═══ */}
       {showLanding && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, overflow: 'hidden' }}>
-          {/* Background image */}
-          <img src="https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%205,%202026,%2007_57_10%20AM.png?updatedAt=1777942652258" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
+          {/* Background image — language-based */}
+          <img src={{
+            id: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2010_32_18%20AM.png',
+            ms: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2011_56_25%20AM.png',
+            vi: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2011_55_41%20AM.png',
+            th: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2011_57_16%20AM.png',
+            fil: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2012_00_00%20PM.png',
+          }[locale] || 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2011_54_58%20AM.png'} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
 
-          {/* Header — language + vendor login */}
-          <div style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* Language selector */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[
-                { code: 'en', label: 'EN', img: 'https://ik.imagekit.io/nepgaxllc/Untitledxxxx-removebg-preview.png?updatedAt=1777592742536' },
-                { code: 'id', label: 'ID', img: 'https://ik.imagekit.io/nepgaxllc/Untitledxxxxcc-removebg-preview.png?updatedAt=1777592820803' },
-              ].map(l => (
-                <button key={l.code} onClick={() => localStorage.setItem('vendorbasic_lang', l.code)} style={{
-                  width: 36, height: 36, borderRadius: '50%', padding: 0,
-                  border: (localStorage.getItem('vendorbasic_lang') || 'en') === l.code ? '2px solid #8DC63F' : '2px solid transparent',
-                  background: 'rgba(0,0,0,0.5)', cursor: 'pointer', overflow: 'hidden',
-                  opacity: (localStorage.getItem('vendorbasic_lang') || 'en') === l.code ? 1 : 0.5,
-                }}>
-                  <img src={l.img} alt={l.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                </button>
-              ))}
-            </div>
-            {/* Vendor login */}
-            <button onClick={() => setVendorLogin(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
-          </div>
 
           {/* Content — centered */}
           <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -538,7 +720,7 @@ export default function App() {
       {isVendor && (
         <div style={S.vendorBar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Vendor Mode</span>
+            <span>{t.vendorMode || 'Vendor Mode'}</span>
             {vendorExpiresAt && (() => {
               const days = Math.ceil((new Date(vendorExpiresAt) - new Date()) / (1000 * 60 * 60 * 24))
               return days > 0 ? (
@@ -547,8 +729,7 @@ export default function App() {
             })()}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ ...S.smallBtn('rgba(0,0,0,0.2)'), color: '#fff' }} onClick={() => setShopConfig(true)}>Shop Config</button>
-            <button style={{ ...S.smallBtn('rgba(0,0,0,0.3)'), color: '#fff' }} onClick={() => setIsVendor(false)}>Logout</button>
+            <button style={{ ...S.smallBtn('rgba(0,0,0,0.2)'), color: '#fff' }} onClick={() => setVendorDrawer(true)}>☰</button>
           </div>
         </div>
       )}
@@ -570,23 +751,124 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Language toggle — native + English */}
+          {nativeLang !== 'en' && (
+            <div style={{ display: 'flex', gap: 0, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden' }}>
+              <button onClick={() => setLocale(nativeLang)} style={{ padding: '4px 8px', border: 'none', background: locale === nativeLang ? 'rgba(141,198,63,0.3)' : 'transparent', color: locale === nativeLang ? '#8DC63F' : 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 800, cursor: 'pointer', minHeight: 30 }}>
+                {LANGUAGES.find(l => l.code === nativeLang)?.flag} {nativeLang.toUpperCase()}
+              </button>
+              <button onClick={() => setLocale('en')} style={{ padding: '4px 8px', border: 'none', background: locale === 'en' ? 'rgba(141,198,63,0.3)' : 'transparent', color: locale === 'en' ? '#8DC63F' : 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 800, cursor: 'pointer', minHeight: 30 }}>
+                🇬🇧 EN
+              </button>
+            </div>
+          )}
           {/* Map/location icon */}
-          <button onClick={() => setShowLocation(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 20, cursor: 'pointer', padding: 8, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            📍
+          <button onClick={() => setShowLocation(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="https://ik.imagekit.io/nepgaxllc/Untitledsdasdvvvdsds-removebg-preview.png?updatedAt=1777253439520" alt="Visit Us" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          </button>
+          {/* Cart icon */}
+          <button onClick={() => { if (cart.length > 0) { setCheckoutOpen(true); setOrderDone(false) } }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <span style={{ fontSize: 22 }}>🛒</span>
+            {cart.length > 0 && (
+              <span style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: 9, background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {cart.reduce((s, c) => s + c.qty, 0)}
+              </span>
+            )}
           </button>
         </div>
       </div>
 
+      {/* --- Add to Home Screen banner --- */}
+      {!installDismissed && !isVendor && (
+        <div style={{ margin: '8px 12px', padding: '10px 12px', borderRadius: 14, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="https://ik.imagekit.io/nepgaxllc/Untitledsdfsdafaass-removebg-preview.png" alt="" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{t.addHomeScreen || 'Add to Home Screen'}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>Quick access to {shopName} from your phone</div>
+          </div>
+          <button onClick={() => { setInstallDismissed(true); localStorage.setItem('vendorbasic_installDismissed', 'true') }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 16, cursor: 'pointer', padding: 4, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
+
+      {/* --- Coming Soon overlay for pending vendors (public visitors only) --- */}
+      {!isVendor && publicVendorStatus === 'pending' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          {publicVendorLogo && <img src={publicVendorLogo} alt="" style={{ width: 80, height: 80, borderRadius: 20, objectFit: 'cover', marginBottom: 16 }} />}
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 8, textAlign: 'center' }}>{publicVendorName || shopName}</h1>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🚀</div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#FFD600', marginBottom: 8 }}>{t.comingSoon || 'Coming Soon!'}</h2>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.6, maxWidth: 280, marginBottom: 30 }}>
+            {locale === 'id' ? 'Kami sedang mempersiapkan menu. Kunjungi lagi segera!' : 'We\'re preparing our menu. Check back shortly!'}
+          </p>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 20, textAlign: 'center', width: '100%', maxWidth: 280 }}>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>Powered by</p>
+            <a href="https://streetlocal.live" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#FFD600' }}>StreetLocal</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Get your own food ordering software</div>
+              <div style={{ fontSize: 12, color: '#8DC63F', fontWeight: 700, marginTop: 4 }}>from $2.50/month →</div>
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* --- Closed banner --- */}
       {!shopOpen && !isVendor && (
-        <div style={S.closedBanner}>This shop is currently closed</div>
+        <div style={S.closedBanner}>{t.shopClosed || 'This shop is currently closed'}</div>
+      )}
+
+      {/* --- Daily Deals Button + Cards --- */}
+      {hasDeals && (
+        <div style={{ padding: '0 16px 8px' }}>
+          <button onClick={() => setShowDeals(!showDeals)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 12, border: 'none', background: '#FFD600', color: '#1a1a1a', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', width: '100%', justifyContent: 'center' }}>
+            🔥 Daily Deals ({activeDeals.length})
+            <span style={{ fontSize: 12 }}>{showDeals ? '▲' : '▼'}</span>
+          </button>
+          {showDeals && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {activeDeals.map(deal => {
+                const now = new Date()
+                const today = now.toISOString().slice(0, 10)
+                const end = new Date(`${today}T${deal.endTime || '23:59'}`)
+                const remaining = Math.max(0, end - now)
+                const hrs = Math.floor(remaining / 3600000)
+                const mins = Math.floor((remaining % 3600000) / 60000)
+                return (
+                  <div key={deal.id} style={{ background: 'rgba(255,214,0,0.08)', border: '1px solid rgba(255,214,0,0.2)', borderRadius: 14, padding: 14, display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {deal.photo && <img src={deal.photo} alt="" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{deal.name}</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: '#FFD600' }}>{fmt(deal.dealPrice)}</span>
+                        <span style={{ fontSize: 12, color: '#888', textDecoration: 'line-through' }}>{fmt(deal.originalPrice)}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#F59E0B', fontWeight: 700, marginTop: 4 }}>
+                        ⏰ {hrs}h {mins}m remaining
+                      </div>
+                    </div>
+                    <button onClick={() => {
+                      const existing = cart.find(c => c.id === 'deal-' + deal.id)
+                      if (existing) { setCart(cart.map(c => c.id === 'deal-' + deal.id ? { ...c, qty: c.qty + 1 } : c)) }
+                      else { setCart([...cart, { id: 'deal-' + deal.id, name: deal.name + ' (Deal)', price: deal.dealPrice, qty: 1, photo: deal.photo }]) }
+                    }} style={{ background: '#FFD600', border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 800, color: '#1a1a1a', cursor: 'pointer', flexShrink: 0 }}>
+                      + Add
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* --- Menu --- */}
       <div style={{ paddingBottom: 12 }}>
         {(() => {
           // Group items by parent category
-          const CAT_ICONS = { Nasi: '🍚', Mie: '🍜', 'Sop/Soto': '🍲', 'Sate/Bakar': '🔥', Gorengan: '🍳', Jajanan: '🍡', Ayam: '🍗', Seafood: '🦐', Roti: '🍞', Minuman: '🥤', Dessert: '🍰', Bubur: '🥣' }
+          const MEALS_ICON = 'https://ik.imagekit.io/nepgaxllc/Untitledasdasdaaavvvdddddasdassssddddfss-removebg-preview.png?updatedAt=1777006431762'
+          const DRINKS_ICON = 'https://ik.imagekit.io/nepgaxllc/Untitledsdasdaaaaddddsadaddsscxcccdddddsssdaasda-removebg-preview.png?updatedAt=1777019670575'
+          const SNACKS_ICON = 'https://ik.imagekit.io/nepgaxllc/Untitledasdasdaaavvvdddddasdasss-removebg-preview.png?updatedAt=1777005796156'
+          const DESSERTS_ICON = 'https://ik.imagekit.io/nepgaxllc/odfssd-removebg-preview.png?updatedAt=1777007963272'
+          const CAT_ICONS = { Nasi: MEALS_ICON, Mie: MEALS_ICON, 'Sop/Soto': MEALS_ICON, 'Sate/Bakar': MEALS_ICON, Gorengan: SNACKS_ICON, Jajanan: SNACKS_ICON, Ayam: MEALS_ICON, Seafood: MEALS_ICON, Roti: SNACKS_ICON, Minuman: DRINKS_ICON, Dessert: DESSERTS_ICON, Bubur: MEALS_ICON, Meal: MEALS_ICON, Drink: DRINKS_ICON, Snack: SNACKS_ICON }
           const getParentCat = (itemCat) => {
             for (const [parent, items] of Object.entries(FOOD_TYPES)) {
               if (items.includes(itemCat)) return parent
@@ -602,8 +884,17 @@ export default function App() {
           return Object.entries(grouped).map(([cat, catItems]) => (
             <div key={cat}>
               <div style={{ padding: '14px 16px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>{CAT_ICONS[cat] || '🍽️'}</span>
-                <span style={{ fontSize: 16, fontWeight: 800, color: '#8DC63F', textTransform: 'uppercase', letterSpacing: 1 }}>{cat}</span>
+                {CAT_ICONS[cat]?.startsWith('http') ? (
+                  <img src={CAT_ICONS[cat]} alt={cat} style={{ width: 42, height: 42, objectFit: 'contain' }} />
+                ) : (
+                  <span style={{ fontSize: 16 }}>{CAT_ICONS[cat] || '🍽️'}</span>
+                )}
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1, flex: 1, textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)' }}>{cat}</span>
+                {hasDeals && cat === Object.keys(grouped)[0] && (
+                  <button onClick={() => setShowDeals(!showDeals)} style={{ padding: '5px 12px', borderRadius: 10, border: 'none', background: '#FFD600', color: '#1a1a1a', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
+                    🔥 Deals
+                  </button>
+                )}
               </div>
               {catItems.map((item) => (
           <div
@@ -644,36 +935,45 @@ export default function App() {
         })()}
 
         {visibleMenu.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>No items on the menu</div>
+          <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>{t.noItems || 'No items on the menu'}</div>
         )}
       </div>
 
       {/* --- FAB add item (vendor) --- */}
       {isVendor && vendorStatus !== 'expired' && <button style={S.fab} onClick={startAdd}>+</button>}
 
+      {/* --- StreetLocal Footer Link --- */}
+      {!isVendor && (
+        <a href="https://streetlocal.live" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', padding: '16px 0 8px', textDecoration: 'none' }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>Powered by </span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)' }}>StreetLocal</span>
+        </a>
+      )}
+
       {/* --- Sticky Cart Bar --- */}
       {totalItems > 0 && !isVendor && (
         <div style={S.stickyCart}>
           <span style={S.cartText}>{totalItems} item{totalItems > 1 ? 's' : ''} &middot; {fmt(totalPrice)}</span>
           <button style={S.checkoutBtn} onClick={() => { setCheckoutOpen(true); setOrderDone(false); detectDeliveryZone() }}>
-            Checkout &rarr;
+            {t.checkout || 'Checkout'} &rarr;
           </button>
         </div>
       )}
 
       {/* ═══ ITEM DETAIL MODAL ═══ */}
       {itemModal && (
-        <div style={S.overlay} onClick={() => setItemModal(null)}>
-          <div style={{ ...S.modal, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%203,%202026,%2012_07_40%20PM.png?updatedAt=1777784877580)', backgroundSize: 'cover', backgroundPosition: 'center' }} onClick={(e) => e.stopPropagation()}>
-            <button style={S.closeBtnX} onClick={() => setItemModal(null)}>&times;</button>
+        <div style={{ ...S.overlay, flexDirection: 'column' }} onClick={() => setItemModal(null)}>
+          <div style={{ ...S.modal, flex: 1, display: 'flex', flexDirection: 'column', backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%203,%202026,%2012_07_40%20PM.png?updatedAt=1777784877580)', backgroundSize: 'cover', backgroundPosition: 'center' }} onClick={(e) => e.stopPropagation()}>
             <img
               src={itemModal.photo || 'https://via.placeholder.com/300'}
               alt={itemModal.name}
               style={{ width: '100%', borderRadius: 16, marginBottom: 16, maxHeight: 240, objectFit: 'cover' }}
             />
-            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{itemModal.name}</h2>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginBottom: 12, lineHeight: 1.5 }}>{itemModal.desc}</p>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#FACC15', marginBottom: 8 }}>{fmt(itemModal.price)}</div>
+            <div style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4, color: '#fff' }}>{itemModal.name}</h2>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 6, lineHeight: 1.5 }}>{itemModal.desc}</p>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#FACC15' }}>{fmt(itemModal.price)}</div>
+            </div>
 
             {/* Quantity selector */}
             <div style={S.qtyRow}>
@@ -687,10 +987,13 @@ export default function App() {
                 style={S.btnGreen}
                 onClick={() => { addToCart(itemModal, modalQty); setItemModal(null) }}
               >
-                Add to Cart &middot; {fmt(itemModal.price * modalQty)}
+                {t.addToCart || 'Add to Cart'} &middot; {fmt(itemModal.price * modalQty)}
               </button>
             )}
-            <button style={S.btnOutline} onClick={() => setItemModal(null)}>Close</button>
+
+            {/* Spacer pushes close to bottom */}
+            <div style={{ flex: 1 }} />
+
           </div>
         </div>
       )}
@@ -698,65 +1001,92 @@ export default function App() {
       {/* ═══ LOCATION PAGE ═══ */}
       {showLocation && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 250, background: '#0a0a0a', overflowY: 'auto' }}>
-          {/* Background */}
-          <div style={{ position: 'fixed', inset: 0, backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928)', backgroundSize: 'cover', backgroundPosition: 'center', pointerEvents: 'none' }} />
+          {/* Background — sticky, full height, content scrolls over */}
+          <div style={{ position: 'sticky', top: 0, width: '100%', height: '100vh', marginBottom: '-100vh', zIndex: 0, pointerEvents: 'none', backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_03_53%20PM.png)', backgroundSize: '100% 100%', backgroundPosition: 'center' }} />
 
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button onClick={() => setShowLocation(false)} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Find Us</h2>
+              <button onClick={() => setShowLocation(false)} style={{ width: 40, height: 40, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{t.visitUs || 'Visit Us'}</h2>
+                {userDistance !== null && (
+                  <p style={{ fontSize: 16, color: '#FFD600', fontWeight: 800, margin: '4px 0 0' }}>{userDistance} km away</p>
+                )}
+              </div>
             </div>
             {!isVendor && (
               <button onClick={() => { setShowLocation(false); setVendorLogin(true) }} style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
             )}
           </div>
 
-          <div style={{ padding: '0 16px 40px', position: 'relative', zIndex: 1 }}>
-            {/* Address */}
-            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <span style={{ fontSize: 24, flexShrink: 0 }}>📍</span>
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{shopName}</h3>
-                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{shopAddress}</p>
+          <div style={{ padding: '0 16px', marginTop: -10, marginBottom: 16, position: 'relative', zIndex: 1 }}>
+            <img src="https://ik.imagekit.io/nepgaxllc/Untitledsssvvw-removebg-preview.png" alt="Visit Us" style={{ width: '100%', borderRadius: 16, marginBottom: 6 }} />
+            <p style={{ fontSize: 15, color: '#fff', lineHeight: 1.7 }}>
+              Welcome to {shopName}! Stop by and experience the taste first-hand. Watch your food being freshly prepared right in front of you — nothing beats eating it straight from the kitchen.
+            </p>
+          </div>
+
+          <div style={{ padding: '0 16px 16px', position: 'relative', zIndex: 1 }}>
+
+            {/* 1. Location Address */}
+            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 16, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{t.ourLocation || 'Our Location'}</h3>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{shopName}</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>{shopAddress}</p>
                 </div>
+                <img src="https://ik.imagekit.io/nepgaxllc/Untitledsdasdvvvdsds-removebg-preview.png?updatedAt=1777253439520" alt="" style={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0 }} />
+              </div>
+              {shopMapsLink && (
+                <a href={shopMapsLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 10, padding: '10px', borderRadius: 10, background: 'rgba(141,198,63,0.1)', border: '1px solid rgba(141,198,63,0.2)', textAlign: 'center', textDecoration: 'none' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#8DC63F' }}>{t.openInMaps || 'Open in Google Maps →'}</span>
+                </a>
+              )}
+            </div>
+
+            {/* 2. Opening Times */}
+            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 16, marginBottom: 10 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>🕐 {t.openingHours || 'Opening Hours'}</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { key: 'monday', en: 'Monday' }, { key: 'tuesday', en: 'Tuesday' }, { key: 'wednesday', en: 'Wednesday' },
+                  { key: 'thursday', en: 'Thursday' }, { key: 'friday', en: 'Friday' }, { key: 'saturday', en: 'Saturday' }, { key: 'sunday', en: 'Sunday' }
+                ].map(({ key, en }) => { const day = t[key] || en; return (
+                  <div key={day} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{day}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: key === 'sunday' ? '#EF4444' : '#8DC63F' }}>
+                      {key === 'sunday' ? (t.closed || 'Closed') : shopHours}
+                    </span>
+                  </div>
+                ) })}
               </div>
             </div>
 
-            {/* Hours */}
-            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 24, flexShrink: 0 }}>🕐</span>
+            {/* 3. Contact Us */}
+            <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 16, marginBottom: 12 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>{t.contactUs || 'Contact Us'}</h3>
+              <a href={`https://wa.me/${shopPhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', padding: '10px', borderRadius: 12, background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.2)', marginBottom: 8 }}>
+                <img src="https://ik.imagekit.io/nepgaxllc/Untitledddddccc-removebg-preview.png?updatedAt=1777894363133" alt="whatsapp" style={{ width: 36, height: 36, flexShrink: 0 }} />
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Opening Hours</h3>
-                  <p style={{ fontSize: 14, color: '#8DC63F', fontWeight: 700 }}>{shopHours}</p>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#25D366' }}>WhatsApp</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{shopPhone.replace(/^(\+?62)/, '0')}</div>
                 </div>
-              </div>
+              </a>
             </div>
 
-            {/* Phone */}
-            <a href={`https://wa.me/${shopPhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'block', background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12, textDecoration: 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 24, flexShrink: 0 }}>📱</span>
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4 }}>WhatsApp</h3>
-                  <p style={{ fontSize: 14, color: '#8DC63F', fontWeight: 700 }}>{shopPhone}</p>
-                </div>
-              </div>
-            </a>
-
-            {/* Google Maps */}
-            {shopMapsLink && (
+            {/* Google Maps — moved inside location card */}
+            {false && shopMapsLink && (
               <a href={shopMapsLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', background: 'rgba(141,198,63,0.08)', border: '1px solid rgba(141,198,63,0.2)', borderRadius: 16, padding: 20, marginBottom: 12, textDecoration: 'none', textAlign: 'center' }}>
                 <span style={{ fontSize: 16, fontWeight: 800, color: '#8DC63F' }}>📍 Open in Google Maps</span>
               </a>
             )}
 
             {/* Social Links */}
-            {(shopInstagram || shopTiktok) && (
+            {(shopInstagram || shopTiktok || shopFacebook || shopYoutube || shopWebsite) && (
               <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 16, padding: 20, marginBottom: 12 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Follow Us</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>{t.followUs || 'Follow Us'}</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {shopInstagram && (
                     <a href={`https://instagram.com/${shopInstagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
@@ -770,6 +1100,24 @@ export default function App() {
                       <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>@{shopTiktok.replace('@', '')}</span>
                     </a>
                   )}
+                  {shopFacebook && (
+                    <a href={shopFacebook.startsWith('http') ? shopFacebook : `https://facebook.com/${shopFacebook}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                      <span style={{ fontSize: 20 }}>👤</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#1877F2' }}>Facebook</span>
+                    </a>
+                  )}
+                  {shopYoutube && (
+                    <a href={shopYoutube.startsWith('http') ? shopYoutube : `https://youtube.com/@${shopYoutube}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                      <span style={{ fontSize: 20 }}>▶️</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#FF0000' }}>YouTube</span>
+                    </a>
+                  )}
+                  {shopWebsite && (
+                    <a href={shopWebsite.startsWith('http') ? shopWebsite : `https://${shopWebsite}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                      <span style={{ fontSize: 20 }}>🌐</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#8DC63F' }}>{shopWebsite}</span>
+                    </a>
+                  )}
                 </div>
               </div>
             )}
@@ -777,97 +1125,451 @@ export default function App() {
         </div>
       )}
 
-      {/* ═══ CHECKOUT MODAL ═══ */}
+      {/* ═══ CHECKOUT PAGE ═══ */}
       {checkoutOpen && (
-        <div style={S.overlay} onClick={() => setCheckoutOpen(false)}>
-          <div style={S.modal} onClick={(e) => e.stopPropagation()}>
-            <button style={S.closeBtnX} onClick={() => setCheckoutOpen(false)}>&times;</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#0a0a0a', backgroundImage: 'url(https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%203,%202026,%2012_07_40%20PM.png?updatedAt=1777784877580)', backgroundSize: 'cover', backgroundPosition: 'center', overflowY: 'auto' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{t.checkout || 'Checkout'}</h2>
+            <button onClick={() => setCheckoutOpen(false)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', background: '#8B0000', color: '#fff', fontSize: 16, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+          </div>
 
-            {!orderDone ? (
-              <>
-                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Checkout</h2>
-
-                {/* Order summary */}
-                <div style={{ marginBottom: 16 }}>
-                  {cart.map((c) => (
-                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 14 }}>
-                      <span>{c.qty}x {c.name}</span>
-                      <span style={{ color: '#FACC15', fontWeight: 600 }}>{fmt(c.price * c.qty)}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 10, paddingTop: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, marginTop: 6 }}>
-                      <span>Food Total</span><span style={{ color: '#FACC15' }}>{fmt(totalPrice)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Estimated Delivery Cost */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8, display: 'block' }}>
-                    📍 Estimated Delivery Cost
-                  </label>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' }}>
-                    {DELIVERY_ZONES.map((z, i) => (
-                      <div key={z.radius} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '12px 16px',
-                        borderBottom: i < DELIVERY_ZONES.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      }}>
-                        <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>{z.name}</span>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: z.fee === 0 ? '#8DC63F' : '#FACC15' }}>{z.label}</span>
+          {!orderDone ? (
+            <div style={{ padding: '12px' }}>
+              {/* Order items — same style as menu cards */}
+              <div style={{ marginBottom: 16 }}>
+                {cart.map((c) => (
+                  <div key={c.id} style={{ ...S.card, margin: '8px 0', alignItems: 'flex-start', position: 'relative' }}>
+                    {/* Delete X — top right corner */}
+                    <button onClick={() => setCart(cart.filter(x => x.id !== c.id))} style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, border: 'none', background: '#8B0000', color: '#fff', fontSize: 12, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>&times;</button>
+                    <img src={c.photo || 'https://via.placeholder.com/80'} alt="" style={S.cardImg} />
+                    <div style={S.cardBody}>
+                      <div style={S.cardName}>{c.name}</div>
+                      <div style={{ fontSize: 14, color: '#FACC15', fontWeight: 700 }}>{fmt(c.price)} each</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#FACC15', marginTop: 2 }}>{fmt(c.price * c.qty)}</div>
+                      {/* Qty controls — under price */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                        <button onClick={() => { if (c.qty > 1) setCart(cart.map(x => x.id === c.id ? { ...x, qty: x.qty - 1 } : x)) }} style={{ width: 30, height: 30, borderRadius: 15, border: 'none', background: '#1a1a1a', color: '#FFD600', fontSize: 18, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: c.qty <= 1 ? 0.3 : 1 }}>−</button>
+                        <span style={{ fontSize: 16, fontWeight: 800, color: '#fff', minWidth: 24, textAlign: 'center' }}>{c.qty}</span>
+                        <button onClick={() => setCart(cart.map(x => x.id === c.id ? { ...x, qty: x.qty + 1 } : x))} style={{ width: 30, height: 30, borderRadius: 15, border: 'none', background: '#1a1a1a', color: '#FFD600', fontSize: 18, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8, lineHeight: 1.5 }}>
-                    * Prices based on GoJek/Grab estimates. Order delivery from your preferred app. Vendor address will be in your WhatsApp order.
-                  </p>
-                </div>
-
-                {/* Pickup or Delivery */}
-                <label style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8, display: 'block' }}>Order Type</label>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-                  <button style={S.payBtn(payMethod === 'pickup')} onClick={() => setPayMethod('pickup')}>🏪 Pickup</button>
-                  <button style={S.payBtn(payMethod === 'delivery')} onClick={() => setPayMethod('delivery')}>🛵 Delivery</button>
-                </div>
-
-                {/* Customer info */}
-                <input style={S.input} placeholder="Your name" value={custName} onChange={(e) => setCustName(e.target.value)} />
-                <input style={S.input} placeholder="Phone / WhatsApp" type="tel" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} />
-                {payMethod === 'delivery' && (
-                  <input style={S.input} placeholder="Delivery address (for GoJek pickup)" value={custAddress} onChange={(e) => setCustAddress(e.target.value)} />
+                ))}
+                {cart.length === 0 && (
+                  <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: 30 }}>{t.cartEmpty || 'Your cart is empty'}</p>
                 )}
+              </div>
 
-                {/* Payment */}
-                <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(141,198,63,0.06)', border: '1px solid rgba(141,198,63,0.15)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>💵</span>
-                  <div>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#8DC63F' }}>Cash on Delivery / Pickup</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', display: 'block' }}>Pay when you receive your food</span>
+              {/* Total */}
+              {cart.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 16 }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{t.total || 'Total'}</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: '#FACC15' }}>{fmt(totalPrice)}</span>
+                  </div>
+
+                  {/* Delivery estimate — single line */}
+                  <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#8DC63F' }}>
+                      🛵 Estimated delivery: {userDistance ? `${deliveryZone.label} (${userDistance} km)` : deliveryZone.label}
+                    </div>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, lineHeight: 1.4 }}>
+                      Based on GoJek/Grab rates. Please arrange your own collection or delivery via your preferred service.
+                    </p>
+                  </div>
+
+                  {/* Pickup or Delivery */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    <button style={S.payBtn(payMethod === 'pickup')} onClick={() => setPayMethod('pickup')}>🏪 {t.pickup || 'Pickup'}</button>
+                    <button style={S.payBtn(payMethod === 'delivery')} onClick={() => setPayMethod('delivery')}>🛵 {t.delivery || 'Delivery'}</button>
+                  </div>
+
+                  {/* Customer info */}
+                  <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: 14, padding: 14, marginBottom: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Your Name</label>
+                    <input style={{ ...S.input, marginBottom: 10 }} placeholder="Your name" value={custName} onChange={(e) => setCustName(e.target.value)} />
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Phone / WhatsApp</label>
+                    <input style={{ ...S.input, marginBottom: payMethod === 'delivery' ? 10 : 0 }} placeholder="Phone / WhatsApp" type="tel" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} />
+                    {payMethod === 'delivery' && (
+                      <>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Delivery Address</label>
+                        <input style={S.input} placeholder="Your delivery address" value={custAddress} onChange={(e) => setCustAddress(e.target.value)} />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Order note */}
+                  <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: 14, padding: 14, marginBottom: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Order Note (optional)</label>
+                    <textarea
+                      placeholder="e.g. Extra spicy, no onions, allergies..."
+                      style={{ ...S.input, minHeight: 60, resize: 'vertical', marginBottom: 0 }}
+                      id="orderNote"
+                    />
+                  </div>
+
+                  {/* Payment */}
+                  <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>💵</span>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#8DC63F' }}>Cash on {payMethod === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', display: 'block' }}>Pay when you receive your food</span>
+                    </div>
+                  </div>
+
+                  {/* Order button */}
+                  <button
+                    style={{ ...S.btnGreen, opacity: (custName && custPhone) ? 1 : 0.4 }}
+                    disabled={!custName || !custPhone}
+                    onClick={sendWhatsApp}
+                  >
+                    {t.placeOrder || 'Place Order via WhatsApp'} — {fmt(totalPrice)}
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            /* --- Order Confirmation --- */
+            <div style={{ textAlign: 'center', padding: '60px 24px' }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, color: '#fff' }}>{t.orderSent || 'Order Sent!'}</h2>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                {t.orderSentMsg || 'Your order has been sent via WhatsApp. The vendor will confirm shortly.'}
+              </p>
+              <button style={S.btnGreen} onClick={() => { setCheckoutOpen(false); setCart([]); setOrderDone(false) }}>
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ CUSTOMER DIRECTORY ═══ */}
+      {showCustomers && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#0a0a0a', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{t.myCustomers || 'My Customers'}</h2>
+            <button onClick={() => setShowCustomers(false)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', background: '#8B0000', color: '#fff', fontSize: 16, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+          </div>
+
+          {(() => {
+            const customers = loadJSON('vendorbasic_customers', [])
+            const sorted = [...customers].sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder))
+            const filtered = customerSearch ? sorted.filter(c => c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.phone?.includes(customerSearch)) : sorted
+            const totalRevenue = customers.reduce((s, c) => s + (c.totalSpent || 0), 0)
+
+            return (
+              <div style={{ padding: '0 16px 40px' }}>
+                {/* Stats */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#FFD600' }}>{customers.length}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Customers</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#8DC63F' }}>{customers.reduce((s, c) => s + (c.orders || 0), 0)}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Total Orders</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 12, textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#FACC15' }}>{fmt(totalRevenue)}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Revenue</div>
                   </div>
                 </div>
 
-                <button
-                  style={{ ...S.btnGreen, opacity: (custName && custPhone) ? 1 : 0.4 }}
-                  disabled={!custName || !custPhone}
-                  onClick={sendWhatsApp}
-                >
-                  Place Order via WhatsApp
-                </button>
-              </>
-            ) : (
-              /* --- Order Confirmation --- */
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>&#10003;</div>
-                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Order Sent!</h2>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 1.5, marginBottom: 24 }}>
-                  Your order has been sent via WhatsApp.<br />The vendor will confirm shortly.
-                </p>
-                <button style={S.btnGreen} onClick={() => { setCheckoutOpen(false); setCart([]); setOrderDone(false) }}>
-                  Done
-                </button>
+                {/* Search */}
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={e => setCustomerSearch(e.target.value)}
+                  placeholder="Search customer name or phone..."
+                  style={{ ...S.input, marginBottom: 12 }}
+                />
+
+                {/* Promo message template */}
+                <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', borderRadius: 14, padding: 14, marginBottom: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Promo Message Template</label>
+                  <textarea
+                    value={promoMsg}
+                    onChange={e => setPromoMsg(e.target.value)}
+                    placeholder={`Hi {name}! 👋\nSpecial offer today at ${shopName}!\n20% off all menu items.\nOrder now: streetlocal.live/${shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                    style={{ ...S.input, minHeight: 80, resize: 'vertical', marginBottom: 0 }}
+                  />
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Use {'{name}'} to personalise each message</p>
+                </div>
+
+                {/* Customer list */}
+                {filtered.length === 0 && (
+                  <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: 30, fontSize: 14 }}>
+                    {customers.length === 0 ? 'No customers yet. They will appear here after their first order.' : 'No customers match your search.'}
+                  </p>
+                )}
+                {filtered.map((c, i) => {
+                  const daysSince = Math.floor((Date.now() - new Date(c.lastOrder).getTime()) / 86400000)
+                  const lastLabel = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : `${daysSince}d ago`
+                  return (
+                    <div key={i} style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', borderRadius: 14, padding: 14, marginBottom: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{c.name || 'Customer'}</div>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{c.phone}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 11, color: '#8DC63F', fontWeight: 700 }}>{c.orders} order{c.orders > 1 ? 's' : ''}</div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{lastLabel}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#FACC15' }}>{fmt(c.totalSpent || 0)} total</span>
+                        <button
+                          onClick={() => {
+                            const msg = (promoMsg || `Hi ${c.name}! 👋\nSpecial offer today at ${shopName}!\nOrder now and enjoy great food.`).replace('{name}', c.name || 'there')
+                            window.open(`https://wa.me/${c.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank')
+                          }}
+                          style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: '#25D366', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          💬 Send
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            )}
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ═══ VENDOR SIDE DRAWER ═══ */}
+      {vendorDrawer && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500 }} onClick={() => setVendorDrawer(false)} />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 260, background: '#1a1a1a', zIndex: 501, overflowY: 'auto', borderLeft: '1px solid rgba(255,255,255,0.08)', animation: 'slideRight 0.2s ease' }}>
+            {/* Header */}
+            <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>Dashboard</span>
+                <button onClick={() => setVendorDrawer(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer' }}>✕</button>
+              </div>
+              <span style={{ fontSize: 11, color: '#8DC63F' }}>{shopName}</span>
+            </div>
+
+            {/* Menu items */}
+            {[
+              { icon: '⚙️', label: 'Shop Config', onClick: () => { setShopConfig(true); setVendorDrawer(false) } },
+              { icon: '🛵', label: 'Delivery Settings', onClick: () => { setShowDeliverySettings(true); setVendorDrawer(false) } },
+              { icon: '👥', label: 'My Customers', onClick: () => { setShowCustomers(true); setVendorDrawer(false) } },
+              { icon: '🍽️', label: 'Daily Deals', onClick: () => { setVendorDrawer(false) } },
+            ].map(item => (
+              <button key={item.label} onClick={item.onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '14px 16px', border: 'none', background: 'transparent', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+
+            {/* Theme Backgrounds — full page preview */}
+            <div style={{ padding: '16px' }}>
+              <h3 style={{ fontSize: 13, fontWeight: 800, color: '#FFD600', marginBottom: 10 }}>🎨 App Theme</h3>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>Tap a theme to preview how your menu will look</p>
+
+              {/* Horizontal scroll of full previews */}
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 10, scrollbarWidth: 'none' }}>
+                {[
+                  { id: 'default', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_19_01%20PM.png', label: 'Wood' },
+                  { id: 'dark', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%204,%202026,%2004_43_21%20PM.png?updatedAt=1777887818629', label: 'Dark' },
+                  { id: 'bamboo', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20Apr%2030,%202026,%2004_47_24%20PM.png?updatedAt=1777542461928', label: 'Bamboo' },
+                  { id: 'kebab', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_46_43%20PM.png', label: 'Kebab' },
+                  { id: 'burger', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_47_38%20PM.png', label: 'Burgers' },
+                  { id: 'donut', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_49_41%20PM.png', label: 'Donuts' },
+                  { id: 'asia', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2001_03_53%20PM.png', label: 'Asia' },
+                  { id: 'satay', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2002_02_22%20PM.png', label: 'Satay' },
+                  { id: 'juice', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2002_03_51%20PM.png', label: 'Juice' },
+                  { id: 'friedrice', img: 'https://ik.imagekit.io/nepgaxllc/ChatGPT%20Image%20May%206,%202026,%2002_07_16%20PM.png', label: 'Fried Rice' },
+                ].map(theme => (
+                  <button key={theme.id} onClick={() => {
+                    setShopTheme(theme.id)
+                    localStorage.setItem('vendorbasic_theme', theme.id)
+                    localStorage.setItem('vendorbasic_themeBg', theme.img)
+                    const bg = document.getElementById('app-bg')
+                    if (bg) bg.style.backgroundImage = `url(${theme.img})`
+                  }} style={{ border: shopTheme === theme.id ? '3px solid #FFD600' : '3px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', cursor: 'pointer', padding: 0, background: 'none', flexShrink: 0, width: 180 }}>
+                    {/* Full app preview */}
+                    <div style={{ width: '100%', height: 280, backgroundImage: `url(${theme.img})`, backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                      {/* Mock header */}
+                      <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 20, height: 20, borderRadius: 10, background: 'rgba(255,255,255,0.2)' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ height: 6, width: '60%', background: 'rgba(255,255,255,0.5)', borderRadius: 3, marginBottom: 3 }} />
+                          <div style={{ height: 4, width: '40%', background: 'rgba(255,255,255,0.2)', borderRadius: 2 }} />
+                        </div>
+                      </div>
+                      {/* Mock category header */}
+                      <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ width: 16, height: 16, borderRadius: 4, background: 'rgba(255,255,255,0.15)' }} />
+                        <div style={{ height: 6, width: '30%', background: 'rgba(255,255,255,0.4)', borderRadius: 3 }} />
+                      </div>
+                      {/* Mock menu cards */}
+                      {[1, 2, 3].map(i => (
+                        <div key={i} style={{ margin: '3px 10px', padding: 8, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ height: 5, width: '70%', background: 'rgba(255,255,255,0.5)', borderRadius: 3, marginBottom: 4 }} />
+                            <div style={{ height: 4, width: '50%', background: 'rgba(255,255,255,0.2)', borderRadius: 2, marginBottom: 3 }} />
+                            <div style={{ height: 5, width: '35%', background: '#FACC15', borderRadius: 3, opacity: 0.7 }} />
+                          </div>
+                        </div>
+                      ))}
+                      {/* Mock sticky cart */}
+                      <div style={{ marginTop: 'auto', padding: '6px 10px 8px' }}>
+                        <div style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 10, padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ height: 5, width: '40%', background: 'rgba(255,255,255,0.3)', borderRadius: 3 }} />
+                          <div style={{ height: 16, width: 40, background: 'rgba(255,255,255,0.2)', borderRadius: 6 }} />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Label */}
+                    <div style={{ fontSize: 11, fontWeight: 800, color: shopTheme === theme.id ? '#FFD600' : '#888', padding: '6px 0', textAlign: 'center', background: shopTheme === theme.id ? 'rgba(255,214,0,0.1)' : '#111' }}>
+                      {shopTheme === theme.id ? '✓ ' : ''}{theme.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom upload */}
+              <label style={{ display: 'block', marginTop: 10, padding: '12px', borderRadius: 12, border: '1px dashed rgba(255,255,255,0.15)', textAlign: 'center', cursor: 'pointer', fontSize: 12, color: '#888' }}>
+                📸 Upload Custom Background
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  const url = await uploadMenuImage(vendorId, file)
+                  if (url) {
+                    setShopTheme('custom')
+                    localStorage.setItem('vendorbasic_theme', 'custom')
+                    localStorage.setItem('vendorbasic_themeBg', url)
+                    const bg = document.getElementById('app-bg')
+                    if (bg) bg.style.backgroundImage = `url(${url})`
+                  }
+                }} />
+              </label>
+            </div>
+
+            {/* Logout */}
+            <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <button onClick={() => { setIsVendor(false); setVendorDrawer(false) }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: '#8B0000', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                Logout
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ DELIVERY SETTINGS ═══ */}
+      {showDeliverySettings && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#0a0a0a', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>🛵 Delivery Settings</h2>
+            <button onClick={() => setShowDeliverySettings(false)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', background: '#8B0000', color: '#fff', fontSize: 16, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>&times;</button>
+          </div>
+
+          <div style={{ padding: '0 16px 40px' }}>
+            {/* Enable/Disable */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Delivery Estimates</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Show estimated delivery cost to customers</div>
+              </div>
+              <button onClick={() => setDelEnabled(!delEnabled)} style={{ width: 50, height: 28, borderRadius: 14, border: 'none', background: delEnabled ? '#8DC63F' : '#333', cursor: 'pointer', position: 'relative', transition: 'all 0.2s' }}>
+                <div style={{ width: 22, height: 22, borderRadius: 11, background: '#fff', position: 'absolute', top: 3, left: delEnabled ? 25 : 3, transition: 'all 0.2s' }} />
+              </button>
+            </div>
+
+            {/* Load country defaults */}
+            <button onClick={async () => {
+              if (!supabase) return
+              // Try to detect country
+              try {
+                const res = await fetch('https://ip2c.org/s')
+                const text = await res.text()
+                const country = text.split(';')[1]
+                const { data } = await supabase.from('country_delivery_defaults').select('*').eq('id', country).single()
+                if (data) {
+                  setDelBaseFee(data.base_fee); setDelPerKm(data.per_km); setDelMinCharge(data.min_charge)
+                  setDelMaxKm(data.max_km); setDelCurrency(data.currency)
+                }
+              } catch {}
+            }} style={{ width: '100%', padding: 10, borderRadius: 10, border: '1px solid rgba(141,198,63,0.2)', background: 'rgba(141,198,63,0.06)', color: '#8DC63F', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 16 }}>
+              📍 Load My Country Default Rates
+            </button>
+
+            {/* Currency */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Currency Symbol</label>
+              <input type="text" value={delCurrency} onChange={e => setDelCurrency(e.target.value)} style={S.input} placeholder="Rp" />
+            </div>
+
+
+            {/* Min Charge — flat fee for short distance */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Minimum Delivery Fee (flat rate)</label>
+              <input type="number" value={delMinCharge} onChange={e => setDelMinCharge(parseInt(e.target.value) || 0)} style={S.input} />
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>This flat fee covers deliveries up to the minimum distance below</p>
+            </div>
+
+            {/* Min KM — distance covered by min charge */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Minimum Distance (km) covered by flat fee</label>
+              <input type="number" value={delMinKm} onChange={e => setDelMinKm(parseInt(e.target.value) || 1)} style={S.input} />
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>0-{delMinKm} km = {delCurrency} {delMinCharge.toLocaleString()} flat</p>
+            </div>
+
+            {/* Per KM — after min distance */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Price Per KM (after {delMinKm} km)</label>
+              <input type="number" value={delPerKm} onChange={e => setDelPerKm(parseInt(e.target.value) || 0)} style={S.input} />
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Each km after {delMinKm} km adds {delCurrency} {delPerKm.toLocaleString()}</p>
+            </div>
+
+            {/* Max KM */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Maximum Delivery Distance (km)</label>
+              <input type="number" value={delMaxKm} onChange={e => setDelMaxKm(parseInt(e.target.value) || 0)} style={S.input} />
+            </div>
+
+            {/* Free Delivery */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, marginBottom: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 4 }}>Free Delivery for Orders Above (0 = disabled)</label>
+              <input type="number" value={delFreeAbove} onChange={e => setDelFreeAbove(parseInt(e.target.value) || 0)} style={S.input} />
+              {delFreeAbove > 0 && <p style={{ fontSize: 11, color: '#8DC63F', marginTop: 4 }}>Orders above {delCurrency} {delFreeAbove.toLocaleString()} get free delivery</p>}
+            </div>
+
+            {/* Preview */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 14, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, color: '#FFD600', marginBottom: 10 }}>Preview — What Customers See</h3>
+              {(() => {
+                const calc = (km) => {
+                  if (km <= delMinKm) return delMinCharge
+                  return Math.ceil((delMinCharge + (km - delMinKm) * delPerKm) / 1000) * 1000
+                }
+                return [
+                  { label: 'Pickup', km: 0, fee: 0 },
+                  { label: `0-${delMinKm} km`, km: delMinKm, fee: delMinCharge, note: 'flat' },
+                  { label: `${delMinKm + 1} km`, km: delMinKm + 1, fee: calc(delMinKm + 1) },
+                  { label: '5 km', km: 5, fee: calc(5) },
+                  { label: '10 km', km: 10, fee: calc(10) },
+                  ...(delMaxKm > 10 ? [{ label: '15 km', km: 15, fee: calc(15) }] : []),
+                ].filter(z => z.km <= delMaxKm || z.km === 0).map(z => (
+                  <div key={z.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 13 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>{z.label}</span>
+                    <span style={{ fontWeight: 800, color: z.fee === 0 ? '#8DC63F' : '#FACC15' }}>
+                      {z.fee === 0 ? 'FREE' : `~${delCurrency} ${z.fee.toLocaleString()}`}
+                    </span>
+                  </div>
+                ))
+              })()}
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>
+                Based on GoJek/Grab estimates. Customer arranges their own delivery.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -1076,6 +1778,12 @@ export default function App() {
             <input style={S.input} value={shopInstagram} onChange={(e) => setShopInstagram(e.target.value)} placeholder="nasigorengpakjoko" />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>TikTok Username</label>
             <input style={S.input} value={shopTiktok} onChange={(e) => setShopTiktok(e.target.value)} placeholder="nasigorengpakjoko" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Facebook (URL or username)</label>
+            <input style={S.input} value={shopFacebook} onChange={(e) => setShopFacebook(e.target.value)} placeholder="https://facebook.com/yourpage" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>YouTube (URL or channel name)</label>
+            <input style={S.input} value={shopYoutube} onChange={(e) => setShopYoutube(e.target.value)} placeholder="https://youtube.com/@yourchannel" />
+            <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Website</label>
+            <input style={S.input} value={shopWebsite} onChange={(e) => setShopWebsite(e.target.value)} placeholder="www.yoursite.com" />
             <label style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 4, display: 'block' }}>Shop Status</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <button style={S.toggle(shopOpen)} onClick={() => setShopOpen(!shopOpen)}>
@@ -1084,9 +1792,9 @@ export default function App() {
               <span style={{ fontSize: 15, fontWeight: 600 }}>{shopOpen ? 'Open' : 'Closed'}</span>
             </div>
             <button style={S.btnGreen} onClick={() => {
-              if (vendorId) updateVendorConfig(vendorId, { shop_name: shopName, shop_phone: shopPhone, shop_address: shopAddress, shop_hours: shopHours, shop_food_type: shopFoodType, shop_maps_link: shopMapsLink, shop_instagram: shopInstagram, shop_tiktok: shopTiktok, shop_open: shopOpen }).catch(() => {})
+              if (vendorId) updateVendorConfig(vendorId, { shop_name: shopName, shop_phone: shopPhone, shop_address: shopAddress, shop_hours: shopHours, shop_food_type: shopFoodType, shop_maps_link: shopMapsLink, shop_instagram: shopInstagram, shop_tiktok: shopTiktok, shop_facebook: shopFacebook, shop_youtube: shopYoutube, shop_website: shopWebsite, shop_open: shopOpen }).catch(() => {})
               setShopConfig(false)
-            }}>Done</button>
+            }}>{t.done || 'Done'}</button>
           </div>
         </div>
       )}
